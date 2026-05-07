@@ -6,6 +6,7 @@ import com.fongmi.android.tv.api.config.LiveConfig;
 import com.fongmi.android.tv.api.config.VodConfig;
 import com.fongmi.android.tv.bean.Live;
 import com.fongmi.android.tv.bean.Site;
+import com.fongmi.android.tv.server.bridge.BridgeSites;
 import com.fongmi.android.tv.utils.Task;
 import com.github.catvod.crawler.Spider;
 import com.github.catvod.crawler.SpiderNull;
@@ -49,10 +50,14 @@ public class BaseLoader {
 
     public void clear() {
         Task.execute(() -> {
-            jarLoader.clear();
-            pyLoader.clear();
-            jsLoader.clear();
+            clearSync();
         });
+    }
+
+    public void clearSync() {
+        jarLoader.clear();
+        pyLoader.clear();
+        jsLoader.clear();
     }
 
     public Spider getSpider(String key, String api, String ext, String jar) {
@@ -63,6 +68,8 @@ public class BaseLoader {
     }
 
     public Spider getSpider(String key) {
+        Site bridge = BridgeSites.getRegisteredSite(key);
+        if (!bridge.isEmpty()) return bridge.spider();
         Site site = VodConfig.get().getSite(key);
         Live live = LiveConfig.get().getLive(key);
         if (!site.isEmpty()) return site.spider();
