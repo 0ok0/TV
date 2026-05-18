@@ -16,6 +16,7 @@ import com.fongmi.android.tv.server.bridge.BridgeQr;
 import com.fongmi.android.tv.server.bridge.BridgeSites;
 import com.fongmi.android.tv.server.bridge.BridgeTokens;
 import com.fongmi.android.tv.server.impl.Process;
+import com.fongmi.android.tv.utils.AbiUtil;
 import com.fongmi.android.tv.utils.UrlUtil;
 import com.github.catvod.Proxy;
 import com.github.catvod.crawler.Spider;
@@ -89,10 +90,13 @@ public class Bridge implements Process {
         object.addProperty("version", "1");
         object.addProperty("address", Server.get().getAddress(false));
         object.addProperty("port", Proxy.getPort());
+        object.add("abi", AbiUtil.toJson());
         JsonObject runtimes = new JsonObject();
         runtimes.addProperty("jarDex", "ready");
         runtimes.addProperty("chaquopy", "ready");
         runtimes.addProperty("quickjs", "ready");
+        runtimes.addProperty("nativeP2P", AbiUtil.supportsArmNativeExtractors() ? "available" : "disabled-on-this-abi");
+        runtimes.addProperty("tvbus", "dynamic-so");
         object.add("runtimes", runtimes);
         return object;
     }

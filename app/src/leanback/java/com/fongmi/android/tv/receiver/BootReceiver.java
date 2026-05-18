@@ -10,11 +10,16 @@ import androidx.annotation.NonNull;
 
 import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.api.config.LiveConfig;
+import com.fongmi.android.tv.service.HeadlessServerService;
 
 public class BootReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        try {
+            HeadlessServerService.start(context);
+        } catch (Throwable ignored) {
+        }
         registerCallback();
     }
 

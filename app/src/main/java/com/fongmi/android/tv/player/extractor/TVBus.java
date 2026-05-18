@@ -40,7 +40,8 @@ public class TVBus implements Source.Extractor, Listener {
             tvcore = new TVCore(getPath(core.getSo())).listener(this).auth(core.getAuth()).name(core.getName()).pass(core.getPass()).domain(core.getDomain()).broker(core.getBroker());
             for (Core.Option option : core.getOption()) tvcore.option(option.getKey(), option.getValues());
             tvcore.serv(0).play(8902).mode(1).init();
-        } catch (Exception ignored) {
+        } catch (Throwable ignored) {
+            tvcore = null;
         } finally {
             App.get().setHook(null);
         }
@@ -57,6 +58,7 @@ public class TVBus implements Source.Extractor, Listener {
         Core c = LiveConfig.get().getHome().getCore();
         if (core != null && !core.equals(c)) change();
         if (tvcore == null) init(core = c);
+        if (tvcore == null) throw new ExtractException(ResUtil.getString(R.string.error_play_url));
         latch = new CountDownLatch(1);
         tvcore.start(url);
         latch.await();

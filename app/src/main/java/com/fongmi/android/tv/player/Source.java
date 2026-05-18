@@ -14,6 +14,7 @@ import com.fongmi.android.tv.player.extractor.TVBus;
 import com.fongmi.android.tv.player.extractor.Thunder;
 import com.fongmi.android.tv.player.extractor.Video;
 import com.fongmi.android.tv.player.extractor.Youtube;
+import com.fongmi.android.tv.utils.AbiUtil;
 import com.fongmi.android.tv.utils.Task;
 
 import java.util.ArrayList;
@@ -32,11 +33,13 @@ public class Source {
 
     public Source() {
         extractors = new ArrayList<>();
-        extractors.add(new Force());
-        extractors.add(new JianPian());
+        if (AbiUtil.supportsArmNativeExtractors()) {
+            extractors.add(new Force());
+            extractors.add(new JianPian());
+        }
         extractors.add(new Push());
         extractors.add(new Strm());
-        extractors.add(new Thunder());
+        if (AbiUtil.supportsArmNativeExtractors()) extractors.add(new Thunder());
         extractors.add(new TVBus());
         extractors.add(new Video());
         extractors.add(new Youtube());
@@ -52,7 +55,7 @@ public class Source {
 
     private void addCallable(Iterator<Episode> iterator, List<Callable<List<Episode>>> items) {
         String url = iterator.next().getUrl();
-        if (Thunder.Parser.match(url)) {
+        if (AbiUtil.supportsArmNativeExtractors() && Thunder.Parser.match(url)) {
             items.add(Thunder.Parser.get(url));
             iterator.remove();
         } else if (Youtube.Parser.match(url)) {

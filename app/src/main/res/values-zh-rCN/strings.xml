@@ -2,6 +2,7 @@
 
     <!-- App -->
     <string name="app_name">影视</string>
+    <string name="server_running">桥接服务运行中</string>
 
     <!-- Live -->
     <string name="live_pass">密码</string>
