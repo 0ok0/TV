@@ -251,21 +251,30 @@ public class Bridge implements Process {
         String action = string(body, "action");
         JsonObject bridgeAction = cloudAction(site, action);
         if (bridgeAction != null) return bridgeAction;
+        if (isConfigCenterSite(site)) return unsupportedConfigAction(action);
         if (inVodConfig(site)) return result(SiteApi.action(site.getKey(), action));
         String json = site.recent().spider().action(action);
         return result(Result.fromJson(json));
     }
 
     private JsonObject cloudAction(Site site, String action) {
+        action = normalizeCloudAction(action);
         switch (action) {
             case "LoginShow":
             case "pushCkShow":
-                JsonObject login = ok();
-                login.addProperty("mode", "cloudLogin");
-                login.addProperty("action", action);
-                login.addProperty("message", "选择网盘登录方式，登录状态只保存到 Android Bridge");
-                login.add("prompts", BridgeTokens.loginPrompts(site));
-                return login;
+                return cloudLogin(site, action, BridgeTokens.loginPrompts(site));
+            case "quarkLogin":
+                return cloudLogin(site, action, BridgeTokens.promptForProvider(site, "quark", "扫码登录后，Cookie 会保存到 Android Bridge 运行时"));
+            case "ucLogin":
+                return cloudLogin(site, action, BridgeTokens.promptForProvider(site, "uc", "扫码登录后，Cookie 会保存到 Android Bridge 运行时"));
+            case "aliLogin":
+                return cloudLogin(site, action, BridgeTokens.promptForProvider(site, "ali", "登录或粘贴 Token 后，会保存到 Android Bridge 运行时"));
+            case "baiduLogin":
+                return cloudLogin(site, action, BridgeTokens.promptForProvider(site, "baidu", "登录或粘贴 Cookie 后，会保存到 Android Bridge 运行时"));
+            case "115Login":
+                return cloudLogin(site, action, BridgeTokens.promptForProvider(site, "115", "粘贴 115 Cookie 后，会保存到 Android Bridge 运行时"));
+            case "123panLogin":
+                return cloudLogin(site, action, BridgeTokens.promptForProvider(site, "123pan", "粘贴 123 网盘 Token 或 Cookie 后，会保存到 Android Bridge 运行时"));
             case "quarkClean":
                 return BridgeTokens.clear("quark");
             case "ucClean":
@@ -274,9 +283,74 @@ public class Bridge implements Process {
                 return BridgeTokens.clear("ali");
             case "BdClean":
                 return BridgeTokens.clear("baidu");
+            case "115Clean":
+                return BridgeTokens.clear("115");
+            case "123panClean":
+                return BridgeTokens.clear("123pan");
             default:
                 return null;
         }
+    }
+
+    private JsonObject cloudLogin(Site site, String action, JsonObject prompt) {
+        JsonArray prompts = new JsonArray();
+        prompts.add(prompt);
+        return cloudLogin(site, action, prompts);
+    }
+
+    private JsonObject cloudLogin(Site site, String action, JsonArray prompts) {
+        JsonObject login = ok();
+        login.addProperty("mode", "cloudLogin");
+        login.addProperty("action", action);
+        login.addProperty("message", "选择网盘登录方式，登录状态只保存到 Android Bridge");
+        login.add("prompts", prompts);
+        return login;
+    }
+
+    private String normalizeCloudAction(String action) {
+        String value = action == null ? "" : action.trim();
+        String lower = value.toLowerCase(Locale.ROOT);
+        switch (lower) {
+            case "baidupanlogin":
+            case "bdlogin":
+                return "baiduLogin";
+            case "baidupanclear":
+            case "bdclean":
+                return "BdClean";
+            case "quarkcookie":
+            case "quarklogin":
+                return "quarkLogin";
+            case "quarkclearcookie":
+                return "quarkClean";
+            case "ucpancookie":
+            case "uctvpancookie":
+            case "uclogin":
+                return "ucLogin";
+            case "ucpanallclearcookie":
+                return "ucClean";
+            case "aliyuntoken":
+            case "alilogin":
+                return "aliLogin";
+            case "aliyuncleartoken":
+                return "aliClean";
+            case "115pancookie":
+                return "115Login";
+            case "115panclearcookie":
+                return "115Clean";
+            case "pan123login":
+            case "123panlogin":
+                return "123panLogin";
+            default:
+                return value;
+        }
+    }
+
+    private JsonObject unsupportedConfigAction(String action) {
+        JsonObject object = ok();
+        object.addProperty("mode", "message");
+        object.addProperty("action", action);
+        object.addProperty("message", "这个配置项暂不能在 macOS 客户端直接设置，请先用已支持的网盘 Cookie/Token 配置项，或在 Android 端配置中心处理。");
+        return object;
     }
 
     private JsonObject qrLogin(Site site, JsonObject body) {
@@ -444,9 +518,13 @@ public class Bridge implements Process {
     }
 
     private JsonObject detailAction(Site site, JsonObject body) {
-        if (!isCloudActionSite(site)) return null;
         String action = actionFromDetailId(first(body, "id", "vodId"));
-        if (action.isEmpty()) return null;
+        if (action.isEmpty() && isConfigCenterSite(site)) {
+            action = first(body, "id", "vodId");
+            JsonObject bridgeAction = cloudAction(site, action);
+            return bridgeAction == null ? unsupportedConfigAction(action) : bridgeAction;
+        }
+        if (!isCloudActionSite(site) || action.isEmpty()) return null;
         JsonObject bridgeAction = cloudAction(site, action);
         if (bridgeAction != null) return bridgeAction;
         JsonObject object = error("action_required", "当前云盘配置项需要新版客户端通过 Bridge action 执行");
@@ -456,7 +534,13 @@ public class Bridge implements Process {
 
     private boolean isCloudActionSite(Site site) {
         String text = (site.getKey() + " " + site.getName() + " " + site.getApi()).toLowerCase();
-        return text.contains("mdrive") || text.contains("mydrive") || text.contains("我的云盘") || text.contains("云盘");
+        return text.contains("mdrive") || text.contains("mydrive") || text.contains("我的云盘") || text.contains("云盘") || isConfigCenterSite(site);
+    }
+
+    private boolean isConfigCenterSite(Site site) {
+        String text = (site.getKey() + " " + site.getName() + " " + site.getApi()).toLowerCase(Locale.ROOT);
+        String name = site.getName() == null ? "" : site.getName();
+        return text.contains("wexconfig") || text.contains("wexokconfig") || (name.contains("配置") && name.contains("中心"));
     }
 
     private String actionFromDetailId(String id) {

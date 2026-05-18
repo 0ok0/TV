@@ -64,6 +64,8 @@ public class BridgeTokens {
         prompts.add(promptForProvider(site, "uc", "扫码登录后，Cookie 会保存到 Android Bridge 运行时"));
         prompts.add(promptForProvider(site, "ali", "登录或粘贴 Token 后，会保存到 Android Bridge 运行时"));
         prompts.add(promptForProvider(site, "baidu", "登录或粘贴 Cookie 后，会保存到 Android Bridge 运行时"));
+        prompts.add(promptForProvider(site, "115", "粘贴 115 Cookie 后，会保存到 Android Bridge 运行时"));
+        prompts.add(promptForProvider(site, "123pan", "粘贴 123 网盘 Token 或 Cookie 后，会保存到 Android Bridge 运行时"));
         return prompts;
     }
 
