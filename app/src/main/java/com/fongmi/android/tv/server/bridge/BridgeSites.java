@@ -7,6 +7,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -88,9 +89,22 @@ public class BridgeSites {
     }
 
     private static String safeString(JsonObject object, String key) {
+        String decoded = safeBase64String(object, key + "Base64");
+        if (!decoded.isEmpty()) return decoded;
         if (object == null || !object.has(key) || object.get(key).isJsonNull()) return "";
         try {
             return object.get(key).getAsString().trim();
+        } catch (Throwable ignored) {
+            return "";
+        }
+    }
+
+    private static String safeBase64String(JsonObject object, String key) {
+        if (object == null || !object.has(key) || object.get(key).isJsonNull()) return "";
+        try {
+            String value = object.get(key).getAsString().trim();
+            if (value.isEmpty()) return "";
+            return new String(android.util.Base64.decode(value, android.util.Base64.DEFAULT), StandardCharsets.UTF_8).trim();
         } catch (Throwable ignored) {
             return "";
         }

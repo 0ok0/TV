@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
+import java.net.IDN;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLDecoder;
@@ -102,7 +103,8 @@ public class Bridge implements Process {
     }
 
     private JsonObject register(JsonObject body) {
-        String configUrl = string(body, "configUrl");
+        String configUrl = normalizeUrlForAndroid(string(body, "configUrl"));
+        if (!TextUtils.isEmpty(configUrl)) body.addProperty("configUrl", configUrl);
         ensureVodConfigLoaded(configUrl);
         String configId = BridgeSites.register(body);
         JsonObject object = ok();
@@ -206,6 +208,12 @@ public class Bridge implements Process {
         } catch (TimeoutException e) {
             BridgeTokens.invalidate(site, body);
             return playResult(session, site, body, Result.error("当前网盘播放需要先完成 Bridge 授权或重新扫码登录"));
+        } catch (Exception e) {
+            if (BridgeTokens.shouldPromptOnError(site, body, e)) {
+                BridgeTokens.invalidate(site, body);
+                return playResult(session, site, body, Result.error("当前网盘播放需要先完成 Bridge 授权或重新扫码登录"));
+            }
+            throw e;
         }
         return playResult(session, site, body, result);
     }
@@ -507,9 +515,25 @@ public class Bridge implements Process {
     }
 
     private synchronized void ensureVodConfigLoaded(String configUrl) {
+        configUrl = normalizeUrlForAndroid(configUrl);
         if (TextUtils.isEmpty(configUrl)) return;
         if (!VodConfig.get().getSites().isEmpty() && (configUrl.equals(BridgeSites.getConfigUrl()) || configUrl.equals(VodConfig.getUrl()))) return;
         VodConfig.get().clear().config(Config.find(configUrl, 0)).ensureLoaded();
+    }
+
+    private String normalizeUrlForAndroid(String value) {
+        if (TextUtils.isEmpty(value)) return "";
+        try {
+            URL url = new URL(value);
+            String host = url.getHost();
+            if (TextUtils.isEmpty(host)) return value;
+            String asciiHost = IDN.toASCII(host);
+            if (host.equals(asciiHost)) return value;
+            URI uri = new URI(url.getProtocol(), url.getUserInfo(), asciiHost, url.getPort(), url.getPath(), url.getQuery(), url.getRef());
+            return uri.toASCIIString();
+        } catch (Throwable ignored) {
+            return value;
+        }
     }
 
     private List<Site> allSites() {

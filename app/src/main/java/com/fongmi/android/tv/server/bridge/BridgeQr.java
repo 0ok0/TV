@@ -281,8 +281,10 @@ public class BridgeQr {
             View view = roots.get(index);
             Root root = new Root(view, params(view));
             if (!usableRoot(view) || view == activityRoot || isIgnoredRoot(root, activityRoot)) continue;
+            if (dialogOnly && !isJarLoginRoot(root)) continue;
             return root;
         }
+        if (dialogOnly) return null;
         if (usableRoot(activityRoot) && (!dialogOnly || hasQrImage(activityRoot))) return new Root(activityRoot, params(activityRoot));
         return null;
     }
@@ -309,6 +311,60 @@ public class BridgeQr {
         int type = root.params.type;
         if (type == WindowManager.LayoutParams.TYPE_INPUT_METHOD || type == WindowManager.LayoutParams.TYPE_INPUT_METHOD_DIALOG) return true;
         return containsIgnoreCase(String.valueOf(root.params.getTitle()), "inputmethod");
+    }
+
+    private static boolean isJarLoginRoot(Root root) {
+        if (root == null || !usableRoot(root.view) || looksLikeMainActivity(root.view)) return false;
+        if (root.params != null) {
+            int type = root.params.type;
+            if (type == WindowManager.LayoutParams.TYPE_BASE_APPLICATION || type == WindowManager.LayoutParams.TYPE_APPLICATION_STARTING) return false;
+            if (type == WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG || type == WindowManager.LayoutParams.TYPE_APPLICATION_PANEL || type == WindowManager.LayoutParams.TYPE_APPLICATION_SUB_PANEL) return true;
+            String title = String.valueOf(root.params.getTitle());
+            if (containsIgnoreCase(title, "dialog") || containsIgnoreCase(title, "popup") || containsIgnoreCase(title, "panel")) return true;
+        }
+        if (isLargeRoot(root.view) && !hasLoginCue(root.view)) return false;
+        return hasLoginCue(root.view) || hasEditText(root.view) || (hasQrImage(root.view) && !looksLikeMainActivity(root.view));
+    }
+
+    private static boolean looksLikeMainActivity(View view) {
+        if (!isLargeRoot(view)) return false;
+        String text = readableText(view).toLowerCase(Locale.ROOT);
+        return text.contains("vod") && text.contains("search") && text.contains("setting");
+    }
+
+    private static boolean isLargeRoot(View view) {
+        if (!usableRoot(view)) return false;
+        DisplayMetrics metrics = App.get().getResources().getDisplayMetrics();
+        int screenArea = Math.max(metrics.widthPixels * metrics.heightPixels, 1);
+        int area = view.getWidth() * view.getHeight();
+        return area > screenArea * 0.60f && view.getWidth() > metrics.widthPixels * 0.70f && view.getHeight() > metrics.heightPixels * 0.70f;
+    }
+
+    private static boolean hasLoginCue(View view) {
+        String text = readableText(view).toLowerCase(Locale.ROOT);
+        return containsIgnoreCase(text, "登录")
+                || containsIgnoreCase(text, "扫码")
+                || containsIgnoreCase(text, "二维码")
+                || containsIgnoreCase(text, "授权")
+                || containsIgnoreCase(text, "验证码")
+                || containsIgnoreCase(text, "cookie")
+                || containsIgnoreCase(text, "token")
+                || containsIgnoreCase(text, "网盘")
+                || containsIgnoreCase(text, "夸克")
+                || containsIgnoreCase(text, "百度")
+                || containsIgnoreCase(text, "阿里")
+                || containsIgnoreCase(text, "login")
+                || containsIgnoreCase(text, "qr");
+    }
+
+    private static boolean hasEditText(View view) {
+        if (view == null || !view.isShown()) return false;
+        if (view instanceof EditText) return true;
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int index = 0; index < group.getChildCount(); index++) if (hasEditText(group.getChildAt(index))) return true;
+        }
+        return false;
     }
 
     private static boolean isTransientRoot(Root root) {
@@ -524,8 +580,8 @@ public class BridgeQr {
             Class<?> clazz = Class.forName("android.view.WindowManagerGlobal");
             Method getInstance = clazz.getDeclaredMethod("getInstance");
             Object global = getInstance.invoke(null);
-            addRootViews(roots, global, clazz);
             addViewsField(roots, global, clazz);
+            if (roots.isEmpty()) addRootViews(roots, global, clazz);
         } catch (Throwable ignored) {
         }
         if (App.activity() != null) add(roots, App.activity().getWindow().getDecorView());

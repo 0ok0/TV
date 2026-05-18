@@ -32,10 +32,12 @@ public class BridgeTokens {
     public static boolean shouldPromptBeforePlay(Site site, JsonObject request) {
         if (!looksLikeCloud(site, request, "")) return false;
         String provider = provider(site, request, "");
-        String id = first(request, "id", "url");
-        if (looksLikeEpisodePayload(id)) return false;
-        if (hasSavedCredential(provider)) return false;
-        return false;
+        return !hasBridgeCredential(provider);
+    }
+
+    public static boolean shouldPromptOnError(Site site, JsonObject request, Throwable throwable) {
+        String message = throwable == null ? "" : throwable.getMessage();
+        return looksLikeCloud(site, request, message);
     }
 
     public static boolean shouldPrompt(Site site, JsonObject request, Result result, String url) {
@@ -330,7 +332,7 @@ public class BridgeTokens {
             case "ali":
                 return lower.contains("refresh_token") || lower.contains("access_token") || value.length() > 80;
             case "baidu":
-                return lower.contains("bduss=") || lower.contains("stoken=") || lower.contains("baiduid=") || looksLikeCookie(value);
+                return lower.contains("bduss=") || lower.contains("stoken=") || lower.contains("baiduid=") || lower.contains("panweb=");
             case "115":
             case "123pan":
                 return looksLikeCookie(value) || value.length() > 32;
@@ -354,9 +356,9 @@ public class BridgeTokens {
         String url = loginUrl(provider);
         if (TextUtils.isEmpty(url)) return null;
         JsonObject object = new JsonObject();
-        object.addProperty("type", "androidJarUi");
-        object.addProperty("title", label(provider) + " Jar 登录");
-        object.addProperty("url", "/api/v1/site/" + site.getKey() + "/qrLogin");
+        object.addProperty("type", "webCookie");
+        object.addProperty("title", label(provider) + " 登录");
+        object.addProperty("url", url);
         object.addProperty("cookieKey", "token");
         JsonArray domains = new JsonArray();
         for (String domain : loginDomains(provider)) domains.add(domain);
@@ -442,7 +444,7 @@ public class BridgeTokens {
 
     private static boolean looksLikeCloud(Site site, JsonObject request, String message) {
         String text = joined(site, request, message);
-        return text.contains("网盘") || text.contains("云盘") || looksLikeQuark(text) || looksLikeUc(text) || text.contains("阿里") || text.contains("ali") || text.contains("115") || text.contains("123pan") || text.contains("pan.") || text.contains("drive.");
+        return text.contains("网盘") || text.contains("云盘") || looksLikeQuark(text) || looksLikeUc(text) || text.contains("阿里") || text.contains("ali") || text.contains("百度") || text.contains("baidu") || text.contains("115") || text.contains("123pan") || text.contains("pan.") || text.contains("drive.");
     }
 
     private static boolean isTokenText(String text) {
