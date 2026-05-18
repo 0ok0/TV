@@ -71,6 +71,7 @@ android {
         exclude group: 'stax', module: 'stax-api'
         exclude group: 'xpp3', module: 'xpp3'
         exclude group: 'com.android.support'
+        exclude group: 'io.antmedia', module: 'rtmp-client'
         resolutionStrategy {
             force libs.okhttp
         }
@@ -107,6 +108,10 @@ dependencies {
     implementation libs.appcompat
     implementation libs.lifecycle.service
     implementation libs.media
+    implementation libs.bundles.media3
+    implementation(libs.nextlib.media3ext) {
+        exclude group: 'androidx.media3'
+    }
     implementation libs.palette
     implementation libs.recyclerview
     implementation libs.room.runtime

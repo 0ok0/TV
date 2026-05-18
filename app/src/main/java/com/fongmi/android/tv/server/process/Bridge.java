@@ -351,6 +351,9 @@ public class Bridge implements Process {
             case "input":
                 object = BridgeQr.input(string(body, "elementId"), string(body, "text"));
                 break;
+            case "submit":
+                object = BridgeQr.submit(string(body, "elementId"));
+                break;
             case "back":
                 object = BridgeQr.back();
                 break;

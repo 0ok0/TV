@@ -20,6 +20,11 @@ import com.github.bassaer.library.MDColor;
 
 public final class SubtitleDialog extends BaseBottomSheetDialog {
 
+    private static final float DEFAULT_TEXT_SIZE = 0.0533f;
+    private static final float DEFAULT_BOTTOM_PADDING = 0.08f;
+    private static final float TEXT_SIZE_STEP = 0.006f;
+    private static final float POSITION_STEP = 0.03f;
+
     private DialogSubtitleBinding binding;
     private SubtitleView subtitleView;
 
@@ -59,38 +64,58 @@ public final class SubtitleDialog extends BaseBottomSheetDialog {
 
     @Override
     protected void initEvent() {
-        binding.up.setOnClickListener(this::onUp);
-        binding.down.setOnClickListener(this::onDown);
         binding.large.setOnClickListener(this::onLarge);
         binding.small.setOnClickListener(this::onSmall);
+        binding.up.setOnClickListener(this::onUp);
+        binding.down.setOnClickListener(this::onDown);
         binding.reset.setOnClickListener(this::onReset);
     }
 
-    private void onUp(View view) {
-        subtitleView.addPosition(0.005f);
-        PlayerSetting.putSubtitlePosition(subtitleView.getPosition());
-    }
-
-    private void onDown(View view) {
-        subtitleView.subPosition(0.005f);
-        PlayerSetting.putSubtitlePosition(subtitleView.getPosition());
-    }
-
     private void onLarge(View view) {
-        subtitleView.addTextSize(0.002f);
-        PlayerSetting.putSubtitleTextSize(subtitleView.getTextSize());
+        setTextSize(clamp(textSize() + TEXT_SIZE_STEP, 0.035f, 0.12f));
     }
 
     private void onSmall(View view) {
-        subtitleView.subTextSize(0.002f);
-        PlayerSetting.putSubtitleTextSize(subtitleView.getTextSize());
+        setTextSize(clamp(textSize() - TEXT_SIZE_STEP, 0.035f, 0.12f));
+    }
+
+    private void onUp(View view) {
+        setPosition(clamp(position() + POSITION_STEP, 0.0f, 0.45f));
+    }
+
+    private void onDown(View view) {
+        setPosition(clamp(position() - POSITION_STEP, 0.0f, 0.45f));
     }
 
     private void onReset(View view) {
         PlayerSetting.putSubtitleTextSize(0.0f);
         PlayerSetting.putSubtitlePosition(0.0f);
-        subtitleView.setBottomPosition(0.0f);
+        subtitleView.setBottomPaddingFraction(DEFAULT_BOTTOM_PADDING);
         subtitleView.setUserDefaultTextSize();
+    }
+
+    private void setTextSize(float value) {
+        PlayerSetting.putSubtitleTextSize(value);
+        subtitleView.setFractionalTextSize(value);
+    }
+
+    private void setPosition(float value) {
+        PlayerSetting.putSubtitlePosition(value);
+        subtitleView.setBottomPaddingFraction(value);
+    }
+
+    private float textSize() {
+        float value = PlayerSetting.getSubtitleTextSize();
+        return value == 0 ? DEFAULT_TEXT_SIZE : value;
+    }
+
+    private float position() {
+        float value = PlayerSetting.getSubtitlePosition();
+        return value == 0 ? DEFAULT_BOTTOM_PADDING : value;
+    }
+
+    private float clamp(float value, float min, float max) {
+        return Math.min(Math.max(value, min), max);
     }
 
     @Override

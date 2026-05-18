@@ -210,19 +210,23 @@ public class PlayerManager implements ParseCallback {
 
     public void setDanmakuController(DanmakuController controller) {
         danmakuController = controller;
+        if (danmakuController == null) return;
         danmakuController.setOkHttpClient(OkHttp.player());
         danmakuController.setConfig(DanmakuSetting.getConfig());
     }
 
     public void setDanmakuConfig(DanmakuConfig config) {
+        if (danmakuController == null) return;
         danmakuController.setConfig(config);
     }
 
     public void setDanmakuEnabled(boolean enabled) {
+        if (danmakuController == null) return;
         danmakuController.setEnabled(enabled);
     }
 
     public void sendDanmaku(String text) {
+        if (danmakuController == null) return;
         danmakuController.sendNow(text);
     }
 

@@ -10,6 +10,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -83,6 +84,24 @@ public class BridgeQr {
         });
         sleep(350);
         JsonObject object = actionResult(result.get(), "输入已发送到 Android Jar 弹窗");
+        object.addProperty("acted", result.get());
+        return object;
+    }
+
+    public static JsonObject submit(String elementId) {
+        AtomicReference<Boolean> result = new AtomicReference<>(false);
+        runOnMain(() -> {
+            Root root = selectRoot(true);
+            if (root == null) return;
+            View view = findByPath(root.view, elementId);
+            View target = view != null ? view : focusedView(root.view);
+            if (target == null) target = root.view;
+            if (target instanceof TextView) ((TextView) target).onEditorAction(EditorInfo.IME_ACTION_DONE);
+            result.set(dispatchKey(target, KeyEvent.KEYCODE_ENTER));
+            if (!result.get() && App.activity() != null) result.set(dispatchKey(App.activity().getWindow().getDecorView(), KeyEvent.KEYCODE_ENTER));
+        });
+        sleep(350);
+        JsonObject object = actionResult(result.get(), "确认已发送到 Android Jar 弹窗");
         object.addProperty("acted", result.get());
         return object;
     }
@@ -179,11 +198,18 @@ public class BridgeQr {
         object.addProperty("id", path);
         object.addProperty("role", role);
         object.addProperty("text", text);
+        object.addProperty("value", value(view));
+        object.addProperty("hint", hint(view));
+        object.addProperty("className", view.getClass().getName());
         object.addProperty("x", relativeX(root, view));
         object.addProperty("y", relativeY(root, view));
         object.addProperty("width", view.getWidth());
         object.addProperty("height", view.getHeight());
         object.addProperty("enabled", view.isEnabled());
+        object.addProperty("focused", view.hasFocus());
+        object.addProperty("selected", view.isSelected());
+        object.addProperty("clickable", clickableTarget(view) != null);
+        object.addProperty("focusable", view.isFocusable());
         elements.add(object);
     }
 
@@ -199,9 +225,19 @@ public class BridgeQr {
 
     private static String text(View view) {
         CharSequence value = null;
-        if (view instanceof EditText) value = ((EditText) view).getHint();
+        if (view instanceof EditText) value = hint(view);
         if (TextUtils.isEmpty(value) && view instanceof TextView) value = ((TextView) view).getText();
         if (TextUtils.isEmpty(value)) value = view.getContentDescription();
+        return value == null ? "" : value.toString().trim();
+    }
+
+    private static String value(View view) {
+        CharSequence value = view instanceof TextView ? ((TextView) view).getText() : null;
+        return value == null ? "" : value.toString().trim();
+    }
+
+    private static String hint(View view) {
+        CharSequence value = view instanceof TextView ? ((TextView) view).getHint() : null;
         return value == null ? "" : value.toString().trim();
     }
 
@@ -386,6 +422,26 @@ public class BridgeQr {
             down.recycle();
             up.recycle();
         }
+    }
+
+    private static boolean dispatchKey(View target, int keyCode) {
+        long now = System.currentTimeMillis();
+        KeyEvent down = new KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0);
+        KeyEvent up = new KeyEvent(now, now + 80, KeyEvent.ACTION_UP, keyCode, 0);
+        return target.dispatchKeyEvent(down) | target.dispatchKeyEvent(up);
+    }
+
+    private static View focusedView(View view) {
+        if (view == null || !view.isShown()) return null;
+        if (view.hasFocus()) return view;
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int index = 0; index < group.getChildCount(); index++) {
+                View focused = focusedView(group.getChildAt(index));
+                if (focused != null) return focused;
+            }
+        }
+        return null;
     }
 
     private static EditText findEditText(View view) {
