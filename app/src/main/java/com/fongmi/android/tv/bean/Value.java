@@ -18,7 +18,7 @@ public class Value implements Parcelable, Diffable<Value> {
     private String n;
     @SerializedName("v")
     private String v;
-    private transient boolean activated;
+    private transient boolean selected;
 
     private Value(String v) {
         this.v = v;
@@ -32,7 +32,7 @@ public class Value implements Parcelable, Diffable<Value> {
     protected Value(Parcel in) {
         this.n = in.readString();
         this.v = in.readString();
-        this.activated = in.readByte() != 0;
+        this.selected = in.readByte() != 0;
     }
 
     public static Value create(String v) {
@@ -48,30 +48,30 @@ public class Value implements Parcelable, Diffable<Value> {
     }
 
     public String getV() {
-        return TextUtils.isEmpty(v) ? "" : v;
+        return TextUtils.isEmpty(v) ? "" : v.trim();
     }
 
     public void setV(String v) {
         this.v = v;
     }
 
-    public boolean isActivated() {
-        return activated;
+    public boolean isSelected() {
+        return selected;
     }
 
-    public void setActivated(boolean activated) {
-        this.activated = activated;
+    public void setSelected(boolean selected) {
+        this.selected = selected;
     }
 
-    public void setActivated(Value item) {
+    public void setSelected(Value item) {
         boolean equal = item.equals(this);
-        if (activated && equal) activated = false;
-        else activated = equal;
+        if (selected && equal) selected = false;
+        else selected = equal;
     }
 
     public Value copy() {
         Value copy = new Value(n, v);
-        copy.activated = this.activated;
+        copy.selected = this.selected;
         return copy;
     }
 
@@ -101,7 +101,7 @@ public class Value implements Parcelable, Diffable<Value> {
     public void writeToParcel(Parcel dest, int flags) {
         dest.writeString(this.n);
         dest.writeString(this.v);
-        dest.writeByte(this.activated ? (byte) 1 : (byte) 0);
+        dest.writeByte(this.selected ? (byte) 1 : (byte) 0);
     }
 
     @Override

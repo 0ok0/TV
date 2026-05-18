@@ -56,7 +56,7 @@ public class FlagAdapter extends RecyclerView.Adapter<FlagAdapter.ViewHolder> {
     }
 
     public int getPosition() {
-        for (int i = 0; i < mItems.size(); i++) if (mItems.get(i).isActivated()) return i;
+        for (int i = 0; i < mItems.size(); i++) if (mItems.get(i).isSelected()) return i;
         return 0;
     }
 
@@ -64,9 +64,9 @@ public class FlagAdapter extends RecyclerView.Adapter<FlagAdapter.ViewHolder> {
         return mItems.get(getPosition());
     }
 
-    public void setActivated(Flag item) {
+    public void setSelected(Flag item) {
         if (indexOf(item) == -1) item.setFlag(mItems.get(0).getFlag());
-        for (Flag flag : mItems) flag.setActivated(item);
+        for (Flag flag : mItems) flag.setSelected(item);
         notifyItemRangeChanged(0, getItemCount());
     }
 
@@ -101,7 +101,7 @@ public class FlagAdapter extends RecyclerView.Adapter<FlagAdapter.ViewHolder> {
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Flag item = mItems.get(position);
         holder.binding.text.setText(item.getShow());
-        holder.binding.text.setActivated(item.isActivated());
+        holder.binding.text.setSelected(item.isSelected());
         holder.binding.text.setNextFocusDownId(nextFocusDown);
         holder.binding.getRoot().setOnClickListener(v -> mListener.onItemClick(item));
     }

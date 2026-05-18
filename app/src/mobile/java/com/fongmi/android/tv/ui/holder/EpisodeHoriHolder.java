@@ -25,7 +25,6 @@ public class EpisodeHoriHolder extends BaseEpisodeHolder {
     public void initView(Episode item) {
         binding.text.setMaxWidth(maxWidth);
         binding.text.setSelected(item.isSelected());
-        binding.text.setActivated(item.isActivated());
         binding.text.setText(item.getDesc().concat(item.getName()));
         binding.text.setOnClickListener(v -> listener.onItemClick(item));
     }

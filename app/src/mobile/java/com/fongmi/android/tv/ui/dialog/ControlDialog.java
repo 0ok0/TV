@@ -23,30 +23,27 @@ import com.fongmi.android.tv.ui.base.ViewType;
 import com.fongmi.android.tv.ui.custom.SpaceItemDecoration;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.fongmi.android.tv.utils.Timer;
-import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 import com.google.android.material.slider.Slider;
 
 import java.util.Arrays;
 import java.util.List;
 
-public class ControlDialog extends BaseDialog implements ParseAdapter.OnClickListener {
+public class ControlDialog extends BaseBottomSheetDialog implements ParseAdapter.OnClickListener {
 
+    private final String[] scale;
     private DialogControlBinding binding;
     private ActivityVideoBinding parent;
-    private FragmentActivity activity;
     private List<TextView> scales;
     private PlayerManager player;
-    private final String[] scale;
-    private Listener listener;
     private History history;
     private boolean parse;
 
-    public static ControlDialog create() {
-        return new ControlDialog();
-    }
-
     public ControlDialog() {
         this.scale = ResUtil.getStringArray(R.array.select_scale);
+    }
+
+    public static ControlDialog create() {
+        return new ControlDialog();
     }
 
     public ControlDialog parent(ActivityVideoBinding parent) {
@@ -70,10 +67,8 @@ public class ControlDialog extends BaseDialog implements ParseAdapter.OnClickLis
     }
 
     public ControlDialog show(FragmentActivity activity) {
-        for (Fragment f : activity.getSupportFragmentManager().getFragments()) if (f instanceof BottomSheetDialogFragment) return this;
+        for (Fragment f : activity.getSupportFragmentManager().getFragments()) if (f instanceof ControlDialog) return this;
         show(activity.getSupportFragmentManager(), null);
-        this.listener = (Listener) activity;
-        this.activity = activity;
         return this;
     }
 
@@ -89,8 +84,8 @@ public class ControlDialog extends BaseDialog implements ParseAdapter.OnClickLis
         binding.decode.setText(parent.control.action.decode.getText());
         binding.ending.setText(parent.control.action.ending.getText());
         binding.opening.setText(parent.control.action.opening.getText());
-        binding.loop.setActivated(parent.control.action.loop.isActivated());
-        binding.timer.setActivated(Timer.get().isRunning());
+        binding.repeat.setSelected(parent.control.action.repeat.isSelected());
+        binding.timer.setSelected(Timer.get().isRunning());
         setTrackVisible();
         setTitleVisible();
         setScaleText();
@@ -109,7 +104,7 @@ public class ControlDialog extends BaseDialog implements ParseAdapter.OnClickLis
         binding.title.setOnClickListener(v -> dismiss(parent.control.action.title));
         binding.player.setOnClickListener(v -> dismiss(parent.control.action.player));
         binding.danmaku.setOnClickListener(v -> dismiss(parent.control.action.danmaku));
-        binding.loop.setOnClickListener(v -> active(binding.loop, parent.control.action.loop));
+        binding.repeat.setOnClickListener(v -> active(binding.repeat, parent.control.action.repeat));
         binding.decode.setOnClickListener(v -> click(binding.decode, parent.control.action.decode));
         binding.ending.setOnClickListener(v -> click(binding.ending, parent.control.action.ending));
         binding.opening.setOnClickListener(v -> click(binding.opening, parent.control.action.opening));
@@ -119,7 +114,7 @@ public class ControlDialog extends BaseDialog implements ParseAdapter.OnClickLis
     }
 
     private void onTimer(View view) {
-        App.post(() -> TimerDialog.create().show(activity), 200);
+        TimerDialog.create().show(getActivity());
         dismiss();
     }
 
@@ -131,7 +126,7 @@ public class ControlDialog extends BaseDialog implements ParseAdapter.OnClickLis
     private void setScaleText() {
         for (int i = 0; i < scales.size(); i++) {
             scales.get(i).setText(scale[i]);
-            scales.get(i).setActivated(scales.get(i).getText().equals(parent.control.action.scale.getText()));
+            scales.get(i).setSelected(scales.get(i).getText().equals(parent.control.action.scale.getText()));
         }
     }
 
@@ -144,14 +139,14 @@ public class ControlDialog extends BaseDialog implements ParseAdapter.OnClickLis
     }
 
     private void setScale(View view) {
-        for (TextView textView : scales) textView.setActivated(false);
-        listener.onScale(Integer.parseInt(view.getTag().toString()));
-        view.setActivated(true);
+        for (TextView textView : scales) textView.setSelected(false);
+        ((Listener) requireActivity()).onScale(Integer.parseInt(view.getTag().toString()));
+        view.setSelected(true);
     }
 
     private void active(View view, TextView target) {
         target.performClick();
-        view.setActivated(target.isActivated());
+        view.setSelected(target.isSelected());
     }
 
     private void click(TextView view, TextView target) {
@@ -195,7 +190,7 @@ public class ControlDialog extends BaseDialog implements ParseAdapter.OnClickLis
 
     @Override
     public void onItemClick(Parse item) {
-        listener.onParse(item);
+        ((Listener) requireActivity()).onParse(item);
         binding.parse.getAdapter().notifyItemRangeChanged(0, binding.parse.getAdapter().getItemCount());
     }
 

@@ -7,13 +7,13 @@ import android.text.TextUtils;
 import androidx.annotation.NonNull;
 
 import com.fongmi.android.tv.App;
-import com.fongmi.android.tv.Setting;
 import com.fongmi.android.tv.api.config.VodConfig;
 import com.fongmi.android.tv.gson.DanmakuAdapter;
 import com.fongmi.android.tv.gson.FilterAdapter;
 import com.fongmi.android.tv.gson.HeaderAdapter;
 import com.fongmi.android.tv.gson.MsgAdapter;
 import com.fongmi.android.tv.gson.UrlAdapter;
+import com.fongmi.android.tv.setting.DanmakuSetting;
 import com.fongmi.android.tv.utils.Util;
 import com.github.catvod.utils.Trans;
 import com.google.gson.annotations.JsonAdapter;
@@ -248,7 +248,7 @@ public class Result implements Parcelable {
     }
 
     public List<Danmaku> getDanmaku() {
-        return !Setting.isDanmakuLoad() || danmaku == null ? new ArrayList<>() : danmaku;
+        return !DanmakuSetting.isLoad() || danmaku == null ? new ArrayList<>() : danmaku;
     }
 
     public String getFormat() {

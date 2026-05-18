@@ -2,7 +2,6 @@ package com.fongmi.android.tv.api.config;
 
 import android.text.TextUtils;
 
-import com.fongmi.android.tv.Setting;
 import com.fongmi.android.tv.api.Decoder;
 import com.fongmi.android.tv.api.LiveApi;
 import com.fongmi.android.tv.api.loader.BaseLoader;
@@ -17,6 +16,7 @@ import com.fongmi.android.tv.bean.Rule;
 import com.fongmi.android.tv.db.AppDatabase;
 import com.fongmi.android.tv.event.ConfigEvent;
 import com.fongmi.android.tv.impl.Callback;
+import com.fongmi.android.tv.setting.LiveSetting;
 import com.fongmi.android.tv.utils.UrlUtil;
 import com.github.catvod.bean.Header;
 import com.github.catvod.bean.Proxy;
@@ -173,7 +173,7 @@ public class LiveConfig extends BaseConfig {
     }
 
     public void parse(JsonObject object) {
-        parseConfig(getConfig(), object);
+        initLive(getConfig(), object);
     }
 
     private void initList(JsonObject object) {
@@ -270,11 +270,11 @@ public class LiveConfig extends BaseConfig {
 
     private void setHome(Config config, Live live, boolean save) {
         home = live;
-        home.setActivated(true);
+        home.setSelected(true);
         config.setHome(home.getName());
         if (save) config.save();
-        getLives().forEach(item -> item.setActivated(home));
-        if (!save && (home.isBoot() || Setting.isBootLive())) ConfigEvent.boot();
+        getLives().forEach(item -> item.setSelected(home));
+        if (!save && (home.isBoot() || LiveSetting.isBoot())) ConfigEvent.boot();
     }
 
     private static class Loader {

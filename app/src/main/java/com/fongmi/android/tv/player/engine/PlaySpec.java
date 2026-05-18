@@ -4,12 +4,12 @@ import android.net.Uri;
 
 import androidx.media3.common.MediaMetadata;
 
-import com.fongmi.android.tv.Setting;
 import com.fongmi.android.tv.bean.Danmaku;
 import com.fongmi.android.tv.bean.Drm;
 import com.fongmi.android.tv.bean.Result;
 import com.fongmi.android.tv.bean.Sub;
 import com.fongmi.android.tv.player.PlayerHelper;
+import com.fongmi.android.tv.setting.Setting;
 import com.fongmi.android.tv.utils.UrlUtil;
 import com.google.common.net.HttpHeaders;
 
@@ -123,5 +123,10 @@ public class PlaySpec {
         if (danmakus == null) danmakus = new ArrayList<>();
         if (!item.isEmpty() && !danmakus.contains(item)) danmakus.add(0, item);
         danmakus.forEach(danmaku -> danmaku.setSelected(danmaku.getUrl().equals(item.getUrl())));
+    }
+
+    public void addDanmaku(Danmaku item) {
+        if (danmakus == null) danmakus = new ArrayList<>();
+        if (!item.isEmpty() && !danmakus.contains(item)) danmakus.add(item);
     }
 }

@@ -46,7 +46,7 @@ public class Class implements Parcelable, Diffable<Class> {
     private Float ratio;
 
     private boolean filter;
-    private boolean activated;
+    private boolean selected;
 
     public Class() {
     }
@@ -59,7 +59,7 @@ public class Class implements Parcelable, Diffable<Class> {
         this.land = (Integer) in.readValue(Integer.class.getClassLoader());
         this.circle = (Integer) in.readValue(Integer.class.getClassLoader());
         this.ratio = (Float) in.readValue(Float.class.getClassLoader());
-        this.activated = in.readByte() != 0;
+        this.selected = in.readByte() != 0;
     }
 
     public static Class objectFrom(String json) {
@@ -118,12 +118,12 @@ public class Class implements Parcelable, Diffable<Class> {
         this.filter = filter;
     }
 
-    public boolean isActivated() {
-        return activated;
+    public boolean isSelected() {
+        return selected;
     }
 
-    public void setActivated(boolean activated) {
-        this.activated = activated;
+    public void setSelected(boolean selected) {
+        this.selected = selected;
     }
 
     public boolean isHome() {
@@ -169,7 +169,7 @@ public class Class implements Parcelable, Diffable<Class> {
         dest.writeValue(this.land);
         dest.writeValue(this.circle);
         dest.writeValue(this.ratio);
-        dest.writeByte(this.activated ? (byte) 1 : (byte) 0);
+        dest.writeByte(this.selected ? (byte) 1 : (byte) 0);
     }
 
     @Override

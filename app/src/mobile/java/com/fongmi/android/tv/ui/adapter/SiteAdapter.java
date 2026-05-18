@@ -77,8 +77,7 @@ public class SiteAdapter extends RecyclerView.Adapter<SiteAdapter.ViewHolder> {
         holder.binding.text.setText(item.getName());
         holder.binding.text.setEnabled(on);
         holder.binding.text.setFocusable(on);
-        holder.binding.text.setSelected(on && item.isActivated());
-        holder.binding.text.setActivated(on && item.isActivated());
+        holder.binding.text.setSelected(on && item.isSelected());
         holder.binding.search.setImageResource(getSearchIcon(item));
         holder.binding.change.setImageResource(getChangeIcon(item));
         holder.binding.search.setVisibility(search ? View.VISIBLE : View.GONE);

@@ -31,7 +31,7 @@ public class CollectAdapter extends BaseDiffAdapter<Collect, CollectAdapter.View
     }
 
     public int getPosition() {
-        for (int i = 0; i < getItemCount(); i++) if (getItem(i).isActivated()) return i;
+        for (int i = 0; i < getItemCount(); i++) if (getItem(i).isSelected()) return i;
         return 0;
     }
 
@@ -39,8 +39,8 @@ public class CollectAdapter extends BaseDiffAdapter<Collect, CollectAdapter.View
         return getItems().get(getPosition());
     }
 
-    public void setActivated(int position) {
-        for (int i = 0; i < getItemCount(); i++) getItem(i).setActivated(i == position);
+    public void setSelected(int position) {
+        for (int i = 0; i < getItemCount(); i++) getItem(i).setSelected(i == position);
         notifyItemRangeChanged(0, getItemCount());
     }
 
@@ -53,8 +53,7 @@ public class CollectAdapter extends BaseDiffAdapter<Collect, CollectAdapter.View
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Collect item = getItem(position);
-        holder.binding.text.setSelected(item.isActivated());
-        holder.binding.text.setActivated(item.isActivated());
+        holder.binding.text.setSelected(item.isSelected());
         holder.binding.text.setText(item.getSite().getName());
         holder.binding.text.setOnClickListener(v -> listener.onItemClick(position, item));
     }

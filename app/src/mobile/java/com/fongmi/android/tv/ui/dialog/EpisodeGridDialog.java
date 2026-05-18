@@ -15,29 +15,27 @@ import com.fongmi.android.tv.databinding.DialogEpisodeGridBinding;
 import com.fongmi.android.tv.ui.adapter.EpisodeAdapter;
 import com.fongmi.android.tv.ui.fragment.EpisodeFragment;
 import com.fongmi.android.tv.utils.ResUtil;
-import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 import com.google.android.material.tabs.TabLayoutMediator;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class EpisodeGridDialog extends BaseDialog {
+public class EpisodeGridDialog extends BaseBottomSheetDialog {
 
     private final List<String> titles;
-    private EpisodeAdapter.OnClickListener listener;
     private DialogEpisodeGridBinding binding;
     private List<Episode> episodes;
     private boolean reverse;
     private int spanCount;
     private int itemCount;
 
-    public static EpisodeGridDialog create() {
-        return new EpisodeGridDialog();
-    }
-
     public EpisodeGridDialog() {
         this.titles = new ArrayList<>();
         this.spanCount = 5;
+    }
+
+    public static EpisodeGridDialog create() {
+        return new EpisodeGridDialog();
     }
 
     public EpisodeGridDialog reverse(boolean reverse) {
@@ -51,8 +49,7 @@ public class EpisodeGridDialog extends BaseDialog {
     }
 
     public void show(FragmentActivity activity) {
-        for (Fragment f : activity.getSupportFragmentManager().getFragments()) if (f instanceof BottomSheetDialogFragment) return;
-        this.listener = (EpisodeAdapter.OnClickListener) activity;
+        for (Fragment f : activity.getSupportFragmentManager().getFragments()) if (f instanceof EpisodeGridDialog) return;
         show(activity.getSupportFragmentManager(), null);
     }
 
@@ -71,21 +68,18 @@ public class EpisodeGridDialog extends BaseDialog {
     @Override
     protected void initEvent() {
         getChildFragmentManager().setFragmentResultListener("result", this, (requestKey, bundle) -> {
-            listener.onItemClick(bundle.getParcelable("episode"));
+            ((EpisodeAdapter.OnClickListener) requireActivity()).onItemClick(bundle.getParcelable("episode"));
             dismiss();
         });
     }
 
     private void setSpanCount() {
-        int total = 0;
-        int row = ResUtil.isLand(requireActivity()) ? 5 : 10;
-        for (Episode item : episodes) total += item.getName().length();
-        int offset = (int) Math.ceil((double) total / episodes.size());
-        if (offset >= 12) spanCount = 1;
-        else if (offset >= 8) spanCount = 2;
-        else if (offset >= 4) spanCount = 3;
-        else if (offset >= 2) spanCount = 4;
-        itemCount = spanCount * row;
+        int avg = (int) Math.ceil(episodes.stream().mapToInt(e -> e.getName().length()).average().orElse(0));
+        if (avg >= 12) spanCount = 1;
+        else if (avg >= 8) spanCount = 2;
+        else if (avg >= 4) spanCount = 3;
+        else if (avg >= 2) spanCount = 4;
+        itemCount = spanCount * (ResUtil.isLand(requireActivity()) ? 5 : 10);
     }
 
     private void setTitles() {
@@ -101,7 +95,7 @@ public class EpisodeGridDialog extends BaseDialog {
 
     private void setCurrentPage() {
         for (int i = 0; i < episodes.size(); i++) {
-            if (episodes.get(i).isActivated()) {
+            if (episodes.get(i).isSelected()) {
                 binding.pager.setCurrentItem(i / itemCount);
                 break;
             }

@@ -107,7 +107,6 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
 
     @Override
     protected void initView() {
-        mBinding.swipeLayout.setColorSchemeResources(R.color.accent);
         mScroller = new CustomScroller(this);
         mExtends = getExtend();
         mFilters = getFilter();
@@ -143,15 +142,15 @@ public class TypeFragment extends BaseFragment implements CustomScroller.Callbac
     private void setFilters() {
         for (Filter filter : mFilters) {
             if (mExtends.containsKey(filter.getKey())) {
-                filter.setActivated(mExtends.get(filter.getKey()));
+                filter.setSelected(mExtends.get(filter.getKey()));
             }
         }
     }
 
     private void setClick(ArrayObjectAdapter adapter, String key, Value item) {
-        for (int i = 0; i < adapter.size(); i++) ((Value) adapter.get(i)).setActivated(item);
+        for (int i = 0; i < adapter.size(); i++) ((Value) adapter.get(i)).setSelected(item);
         adapter.notifyArrayItemRangeChanged(0, adapter.size());
-        if (item.isActivated()) mExtends.put(key, item.getV());
+        if (item.isSelected()) mExtends.put(key, item.getV());
         else mExtends.remove(key);
         onRefresh();
     }

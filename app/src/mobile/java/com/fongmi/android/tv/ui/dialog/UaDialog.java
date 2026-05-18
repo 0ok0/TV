@@ -2,56 +2,46 @@ package com.fongmi.android.tv.ui.dialog;
 
 import android.content.DialogInterface;
 import android.text.TextUtils;
-import android.view.LayoutInflater;
 import android.view.inputmethod.EditorInfo;
 
-import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
+import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.R;
-import com.fongmi.android.tv.Setting;
 import com.fongmi.android.tv.databinding.DialogUaBinding;
-import com.fongmi.android.tv.impl.UaCallback;
+import com.fongmi.android.tv.impl.UaListener;
+import com.fongmi.android.tv.setting.Setting;
 import com.fongmi.android.tv.ui.custom.CustomTextListener;
-import com.github.catvod.utils.Util;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
-public class UaDialog {
+public class UaDialog extends BaseAlertDialog {
 
-    private final DialogUaBinding binding;
-    private final UaCallback callback;
-    private AlertDialog dialog;
-    private boolean append;
+    private DialogUaBinding binding;
+    private boolean append = true;
 
-    public static UaDialog create(Fragment fragment) {
-        return new UaDialog(fragment);
+    public static void show(Fragment fragment) {
+        new UaDialog().show(fragment.getChildFragmentManager(), null);
     }
 
-    public UaDialog(Fragment fragment) {
-        this.callback = (UaCallback) fragment;
-        this.binding = DialogUaBinding.inflate(LayoutInflater.from(fragment.getContext()));
-        this.append = true;
+    @Override
+    protected ViewBinding getBinding() {
+        return binding = DialogUaBinding.inflate(getLayoutInflater());
     }
 
-    public void show() {
-        initDialog();
-        initView();
-        initEvent();
+    @Override
+    protected MaterialAlertDialogBuilder getBuilder() {
+        return builder().setTitle(R.string.player_ua).setView(getBinding().getRoot()).setPositiveButton(R.string.dialog_positive, this::onPositive).setNegativeButton(R.string.dialog_negative, null);
     }
 
-    private void initDialog() {
-        dialog = new MaterialAlertDialogBuilder(binding.getRoot().getContext()).setTitle(R.string.player_ua).setView(binding.getRoot()).setPositiveButton(R.string.dialog_positive, this::onPositive).setNegativeButton(R.string.dialog_negative, this::onNegative).create();
-        dialog.getWindow().setDimAmount(0);
-        dialog.show();
-    }
-
-    private void initView() {
+    @Override
+    protected void initView() {
         String text = Setting.getUa();
         binding.text.setText(text);
         binding.text.setSelection(TextUtils.isEmpty(text) ? 0 : text.length());
     }
 
-    private void initEvent() {
+    @Override
+    protected void initEvent() {
         binding.text.addTextChangedListener(new CustomTextListener() {
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -59,7 +49,7 @@ public class UaDialog {
             }
         });
         binding.text.setOnEditorActionListener((textView, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_DONE) dialog.getButton(DialogInterface.BUTTON_POSITIVE).performClick();
+            if (actionId == EditorInfo.IME_ACTION_DONE) onPositive(null, 0);
             return true;
         });
     }
@@ -67,10 +57,10 @@ public class UaDialog {
     private void detect(String s) {
         if (append && "c".equalsIgnoreCase(s)) {
             append = false;
-            binding.text.setText(Util.CHROME);
+            binding.text.setText(com.github.catvod.utils.Util.CHROME);
         } else if (append && "o".equalsIgnoreCase(s)) {
             append = false;
-            binding.text.setText(Util.OKHTTP);
+            binding.text.setText(com.github.catvod.utils.Util.OKHTTP);
         } else if (s.length() > 1) {
             append = false;
         } else if (s.isEmpty()) {
@@ -79,11 +69,7 @@ public class UaDialog {
     }
 
     private void onPositive(DialogInterface dialog, int which) {
-        callback.setUa(binding.text.getText().toString().trim());
-        dialog.dismiss();
-    }
-
-    private void onNegative(DialogInterface dialog, int which) {
-        dialog.dismiss();
+        ((UaListener) requireParentFragment()).setUa(binding.text.getText().toString().trim());
+        dismiss();
     }
 }

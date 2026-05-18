@@ -24,10 +24,10 @@ import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.R;
-import com.fongmi.android.tv.Setting;
 import com.fongmi.android.tv.bean.Word;
 import com.fongmi.android.tv.databinding.FragmentSearchBinding;
 import com.fongmi.android.tv.impl.Callback;
+import com.fongmi.android.tv.setting.Setting;
 import com.fongmi.android.tv.ui.adapter.RecordAdapter;
 import com.fongmi.android.tv.ui.adapter.WordAdapter;
 import com.fongmi.android.tv.ui.base.BaseFragment;
@@ -189,7 +189,7 @@ public class SearchFragment extends BaseFragment implements MenuProvider, WordAd
 
     private void onSite() {
         Util.hideKeyboard(mBinding.keyword);
-        mBinding.keyword.post(() -> SiteDialog.create(this).search().show());
+        mBinding.keyword.post(() -> SiteDialog.create().search().show(this));
     }
 
     @Override

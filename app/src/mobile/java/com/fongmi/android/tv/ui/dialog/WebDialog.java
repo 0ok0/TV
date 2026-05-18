@@ -16,7 +16,7 @@ public class WebDialog {
         return new WebDialog(view);
     }
 
-    public WebDialog(View view) {
+    private WebDialog(View view) {
         this.dialog = new MaterialAlertDialogBuilder(App.activity()).setView(view).create();
         this.dialog.setOnDismissListener((DialogInterface.OnDismissListener) view);
     }
@@ -32,7 +32,6 @@ public class WebDialog {
     }
 
     private void initDialog() {
-        dialog.getWindow().setDimAmount(0);
         dialog.show();
     }
 }

@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="16dp">
+    android:padding="24dp">
 
     <FrameLayout
         android:id="@+id/frame"
@@ -47,7 +47,7 @@
         android:layout_toEndOf="@+id/frame"
         android:ellipsize="end"
         android:maxLines="3"
-        android:textColor="?android:attr/textColorPrimary"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="16sp"
         tools:text="狂飆" />
 
@@ -59,7 +59,7 @@
         android:layout_alignStart="@+id/name"
         android:layout_marginTop="2dp"
         android:singleLine="true"
-        android:textColor="?android:attr/textColorSecondary"
+        android:textColor="?attr/colorOnSurfaceVariant"
         android:textSize="14sp"
         tools:text="Xiaomi 13" />
 

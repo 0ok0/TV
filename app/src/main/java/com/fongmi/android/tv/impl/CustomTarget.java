@@ -13,10 +13,6 @@ public class CustomTarget<T> extends com.bumptech.glide.request.target.CustomTar
         super();
     }
 
-    public CustomTarget(int width, int height) {
-        super(width, height);
-    }
-
     @Override
     public void onResourceReady(@NonNull T resource, @Nullable Transition<? super T> transition) {
     }

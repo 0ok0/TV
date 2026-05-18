@@ -12,6 +12,10 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.TextView;
 
+import com.fongmi.android.tv.R;
+import com.fongmi.android.tv.utils.KeyUtil;
+import com.fongmi.android.tv.utils.ResUtil;
+
 public class CustomMovement extends ScrollingMovementMethod {
 
     private static final int CLICK = 1;
@@ -29,6 +33,7 @@ public class CustomMovement extends ScrollingMovementMethod {
         CharSequence text = view.getText();
         boolean hasLinks = text instanceof Spannable && ((Spannable) text).getSpans(0, text.length(), ClickableSpan.class).length > 0;
         view.setMovementMethod(hasLinks ? CustomMovement.getInstance() : null);
+        if (hasLinks) view.setHighlightColor(ResUtil.getColor(R.color.white_30));
     }
 
     @Override
@@ -42,7 +47,7 @@ public class CustomMovement extends ScrollingMovementMethod {
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
                 if (KeyEvent.metaStateHasNoModifiers(movementMetaState)) {
-                    if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0 && action(CLICK, widget, buffer)) {
+                    if (KeyUtil.isActionDown(event) && event.getRepeatCount() == 0 && action(CLICK, widget, buffer)) {
                         return true;
                     }
                 }

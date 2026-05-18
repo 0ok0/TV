@@ -45,7 +45,7 @@ public class EpisodeAdapter extends RecyclerView.Adapter<BaseEpisodeHolder> {
     }
 
     public int getPosition() {
-        for (int i = 0; i < mItems.size(); i++) if (mItems.get(i).isActivated()) return i;
+        for (int i = 0; i < mItems.size(); i++) if (mItems.get(i).isSelected()) return i;
         return 0;
     }
 

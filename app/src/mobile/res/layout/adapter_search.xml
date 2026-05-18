@@ -23,7 +23,7 @@
         android:ellipsize="end"
         android:maxWidth="90dp"
         android:singleLine="true"
-        android:textColor="@color/white"
+        android:textColor="@color/text_site"
         android:textSize="12sp"
         android:visibility="gone"
         tools:text="泥巴"

@@ -24,6 +24,7 @@ public class Proxy implements Comparable<Proxy> {
     private List<String> urls;
 
     private List<java.net.Proxy> proxies;
+    private List<Uri> uris;
     private boolean wildcard;
 
     public static List<Proxy> arrayFrom(JsonElement element) {
@@ -38,7 +39,8 @@ public class Proxy implements Comparable<Proxy> {
 
     public void init() {
         wildcard = getHosts().stream().anyMatch(host -> host.contains("*"));
-        proxies = getUrls().stream().map(this::create).filter(Objects::nonNull).toList();
+        uris = getUrls().stream().map(Uri::parse).filter(this::isValid).toList();
+        proxies = uris.stream().map(this::create).filter(Objects::nonNull).toList();
     }
 
     public String getName() {
@@ -57,12 +59,27 @@ public class Proxy implements Comparable<Proxy> {
         return proxies == null ? Collections.emptyList() : proxies;
     }
 
-    private java.net.Proxy create(String url) {
-        Uri uri = Uri.parse(url);
-        if (uri.getScheme() == null || uri.getHost() == null || uri.getPort() <= 0) return null;
-        if (uri.getScheme().startsWith("http")) return new java.net.Proxy(java.net.Proxy.Type.HTTP, InetSocketAddress.createUnresolved(uri.getHost(), uri.getPort()));
-        if (uri.getScheme().startsWith("socks")) return new java.net.Proxy(java.net.Proxy.Type.SOCKS, InetSocketAddress.createUnresolved(uri.getHost(), uri.getPort()));
+    public String getUserInfo(String host) {
+        return getUserInfo(host, "socks");
+    }
+
+    public String getUserInfo(String host, String scheme) {
+        return uris.stream().filter(uri -> isScheme(uri, scheme) && host.equalsIgnoreCase(uri.getHost())).map(Uri::getUserInfo).filter(Objects::nonNull).findFirst().orElse(null);
+    }
+
+    private boolean isValid(Uri uri) {
+        return uri.getScheme() != null && uri.getHost() != null && uri.getPort() > 0;
+    }
+
+    private java.net.Proxy create(Uri uri) {
+        InetSocketAddress address = InetSocketAddress.createUnresolved(uri.getHost(), uri.getPort());
+        if (isScheme(uri, "http")) return new java.net.Proxy(java.net.Proxy.Type.HTTP, address);
+        if (isScheme(uri, "socks")) return new java.net.Proxy(java.net.Proxy.Type.SOCKS, address);
         return null;
+    }
+
+    private boolean isScheme(Uri uri, String scheme) {
+        return uri.getScheme() != null && uri.getScheme().startsWith(scheme);
     }
 
     @Override

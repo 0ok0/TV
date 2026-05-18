@@ -1,6 +1,7 @@
 package com.fongmi.android.tv.player.engine;
 
 import androidx.media3.common.MediaMetadata;
+import androidx.media3.common.MediaTitle;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.Tracks;
@@ -44,6 +45,21 @@ public interface PlayerEngine {
     boolean haveTrack(int type);
 
     Tracks getCurrentTracks();
+
+    default boolean haveTitle() {
+        return false;
+    }
+
+    default boolean isRepeatOne() {
+        return false;
+    }
+
+    default void setRepeatOne(boolean repeat) {
+    }
+
+    default List<MediaTitle> getCurrentMediaTitles() {
+        return Collections.emptyList();
+    }
 
     String getErrorMessage(PlaybackException e);
 

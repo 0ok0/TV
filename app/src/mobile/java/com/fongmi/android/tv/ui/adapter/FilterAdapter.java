@@ -8,16 +8,16 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.fongmi.android.tv.bean.Filter;
 import com.fongmi.android.tv.databinding.AdapterFilterBinding;
-import com.fongmi.android.tv.impl.FilterCallback;
+import com.fongmi.android.tv.impl.FilterListener;
 
 import java.util.List;
 
 public class FilterAdapter extends RecyclerView.Adapter<FilterAdapter.ViewHolder> {
 
-    private final FilterCallback listener;
+    private final FilterListener listener;
     private final List<Filter> mItems;
 
-    public FilterAdapter(FilterCallback listener, List<Filter> items) {
+    public FilterAdapter(FilterListener listener, List<Filter> items) {
         this.listener = listener;
         this.mItems = items;
     }

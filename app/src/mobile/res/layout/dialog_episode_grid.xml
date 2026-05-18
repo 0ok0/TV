@@ -5,29 +5,37 @@
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
-    <com.google.android.material.textview.MaterialTextView
-        android:layout_width="wrap_content"
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="16dp"
-        android:text="@string/detail_episode"
-        android:textColor="?android:attr/textColorPrimary"
-        android:textSize="16sp" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="24dp"
+        android:paddingTop="24dp"
+        android:paddingBottom="16dp">
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/detail_episode"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="16sp" />
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
 
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tabs"
         android:layout_width="match_parent"
         android:layout_height="32dp"
-        android:layout_marginTop="8dp"
         android:background="@color/transparent"
+        app:tabContentStart="20dp"
         app:tabIndicatorAnimationMode="elastic"
-        app:tabIndicatorColor="?attr/colorControlActivated"
+        app:tabIndicatorColor="?attr/colorPrimary"
         app:tabIndicatorFullWidth="false"
         app:tabIndicatorHeight="2dp"
         app:tabMode="scrollable"
-        app:tabSelectedTextColor="?attr/colorControlActivated"
-        app:tabTextColor="@color/grey_500" />
+        app:tabSelectedTextColor="?attr/colorPrimary"
+        app:tabTextColor="?attr/colorOnSurfaceVariant" />
 
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/pager"

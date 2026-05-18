@@ -67,7 +67,7 @@ public class OkHttp {
 
     public static OkAuthenticator authenticator() {
         if (get().authenticator != null) return get().authenticator;
-        return get().authenticator = new OkAuthenticator();
+        return get().authenticator = new OkAuthenticator(selector());
     }
 
     public static OkProxySelector selector() {
@@ -149,6 +149,10 @@ public class OkHttp {
         return client().newCall(new Request.Builder().url(url).headers(Headers.of(headers)).post(body).build());
     }
 
+    public static Call newCall(String url, RequestBody body, String tag) {
+        return client().newCall(new Request.Builder().url(url).post(body).tag(tag).build());
+    }
+
     public static Call newCall(OkHttpClient client, String url, RequestBody body) {
         return client.newCall(new Request.Builder().url(url).post(body).build());
     }
@@ -223,7 +227,6 @@ public class OkHttp {
         cancelAll();
         dns().clear();
         selector().clear();
-        authenticator().clear();
         authInterceptor().clear();
         requestInterceptor().clear();
         responseInterceptor().clear();

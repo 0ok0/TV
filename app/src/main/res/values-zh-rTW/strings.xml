@@ -32,7 +32,8 @@
     <string name="play_exo">EXO</string>
     <string name="play_next">下集</string>
     <string name="play_prev">上集</string>
-    <string name="play_loop">循環</string>
+    <string name="play_stop">停止</string>
+    <string name="play_repeat">循環</string>
     <string name="play_forward">→</string>
     <string name="play_backward">←</string>
     <string name="play_speed">1.00</string>
@@ -56,9 +57,51 @@
     <string name="play_switch_site">正在切換站源至「<xliff:g name="name">%s</xliff:g>」</string>
     <string name="play_switch_parse">正在切换解析至「<xliff:g name="name">%s</xliff:g>」</string>
 
-    <!-- Danmaku -->
+    <!-- Danmaku Setting -->
     <string name="danmaku">彈幕</string>
     <string name="danmaku_select">選擇彈幕</string>
+    <string name="danmaku_setting">彈幕設定</string>
+    <string name="danmaku_text_size">字體縮放</string>
+    <string name="danmaku_transparency">透明度</string>
+    <string name="danmaku_text_bold">粗體</string>
+    <string name="danmaku_style_mode">字體效果</string>
+    <string name="danmaku_style_none">無</string>
+    <string name="danmaku_style_shadow">陰影</string>
+    <string name="danmaku_style_stroke">描邊</string>
+    <string name="danmaku_style_projection">投影</string>
+    <string name="danmaku_shadow_transparency">陰影透明度</string>
+    <string name="danmaku_stroke_width">描邊寬度</string>
+    <string name="danmaku_projection_offset_x">投影水平偏移</string>
+    <string name="danmaku_projection_offset_y">投影垂直偏移</string>
+    <string name="danmaku_projection_transparency">投影透明度</string>
+    <string name="danmaku_color_mode">顏色模式</string>
+    <string name="danmaku_color_default">原色</string>
+    <string name="danmaku_color_colorful">彩色</string>
+    <string name="danmaku_color_gradient">漸層</string>
+    <string name="danmaku_color_override_hint">彈幕原始顏色將被忽略</string>
+    <string name="danmaku_auto">自動</string>
+    <string name="danmaku_duration">滾動時間</string>
+    <string name="danmaku_fixed_duration">固定顯示時間</string>
+    <string name="danmaku_time_offset">時間偏移</string>
+    <string name="danmaku_max_on_screen">最多同時顯示</string>
+    <string name="danmaku_scroll_area_ratio">滾動區域</string>
+    <string name="danmaku_max_scroll_lines">最大滾動行數</string>
+    <string name="danmaku_max_top_lines">最大頂部行數</string>
+    <string name="danmaku_max_bottom_lines">最大底部行數</string>
+    <string name="danmaku_line_spacing">垂直間距</string>
+    <string name="danmaku_scroll_gap_ratio">水平間距</string>
+    <string name="danmaku_show_scroll">滾動彈幕</string>
+    <string name="danmaku_show_top">頂部固定</string>
+    <string name="danmaku_show_bottom">底部固定</string>
+    <string name="danmaku_show_reverse">反向滾動</string>
+    <string name="danmaku_show_positioned">定位彈幕</string>
+    <string name="danmaku_show_subtitle">字幕型</string>
+    <string name="danmaku_show_special">特效型</string>
+    <string name="danmaku_section_appearance">外觀</string>
+    <string name="danmaku_section_display">顯示</string>
+    <string name="danmaku_section_timing">時間</string>
+    <string name="danmaku_section_density">密度</string>
+    <string name="danmaku_reset">重設</string>
 
     <!-- Parse -->
     <string name="parse">解析</string>
@@ -73,7 +116,11 @@
     <string name="setting_live">直播</string>
     <string name="setting_wall">壁紙</string>
     <string name="setting_player">播放設定</string>
+    <string name="setting_danmaku">彈幕設定</string>
     <string name="setting_incognito">無痕模式</string>
+    <string name="setting_theme_color">主題色彩</string>
+    <string name="setting_auto">自動</string>
+    <string name="setting_custom">自訂</string>
     <string name="setting_size">圖片尺寸</string>
     <string name="setting_doh">DoH</string>
     <string name="setting_proxy">Proxy</string>
@@ -102,12 +149,17 @@
     <string name="player_audio_decode">音訊軟解</string>
     <string name="player_video_decode">視訊軟解</string>
     <string name="player_aac_track">AAC優先</string>
-    <string name="player_danmaku_load">彈幕載入</string>
     <string name="player_adblock">智慧去廣</string>
     <string name="player_tunnel">隧道模式</string>
     <string name="player_buffer">緩衝時間</string>
     <string name="player_speed">長按倍速</string>
     <string name="player_ua">User-Agent</string>
+
+    <!-- Danmaku -->
+    <string name="danmaku_load">彈幕載入</string>
+    <string name="danmaku_api">搜尋接口</string>
+    <string name="danmaku_auto_load">自動搜尋</string>
+    <string name="danmaku_spider_first">爬蟲優先</string>
 
     <!-- Search -->
     <string name="search_keyword">關鍵字…</string>
@@ -154,6 +206,7 @@
 
     <!-- UNIT -->
     <string name="all">全部</string>
+    <string name="yes">有</string>
     <string name="none">無</string>
     <string name="times">倍</string>
     <string name="lines">行</string>

@@ -49,7 +49,7 @@ public class QualityAdapter extends RecyclerView.Adapter<QualityAdapter.ViewHold
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         holder.binding.text.setText(result.getUrl().n(position));
         holder.binding.text.setOnClickListener(v -> onItemClick(position));
-        holder.binding.text.setActivated(result.getUrl().getPosition() == position);
+        holder.binding.text.setSelected(result.getUrl().getPosition() == position);
     }
 
     private void onItemClick(int position) {

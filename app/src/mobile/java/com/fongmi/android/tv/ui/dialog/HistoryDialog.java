@@ -1,95 +1,106 @@
 package com.fongmi.android.tv.ui.dialog;
 
-import android.app.Activity;
-import android.view.LayoutInflater;
-import android.view.WindowManager;
+import android.content.Context;
 
-import androidx.appcompat.app.AlertDialog;
+import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
+import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.bean.Config;
 import com.fongmi.android.tv.databinding.DialogHistoryBinding;
-import com.fongmi.android.tv.impl.ConfigCallback;
+import com.fongmi.android.tv.impl.ConfigListener;
 import com.fongmi.android.tv.ui.adapter.ConfigAdapter;
 import com.fongmi.android.tv.ui.custom.SpaceItemDecoration;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
-public class HistoryDialog implements ConfigAdapter.OnClickListener {
+public class HistoryDialog extends BaseAlertDialog implements ConfigAdapter.OnClickListener {
 
-    private final ConfigCallback callback;
     private DialogHistoryBinding binding;
+    private ConfigListener listener;
     private ConfigAdapter adapter;
-    private AlertDialog dialog;
-    private boolean readOnly;
-    private boolean full;
+
     private int type;
+    private boolean readOnly;
 
-    public static HistoryDialog create(Activity activity) {
-        return new HistoryDialog(activity);
+    public static HistoryDialog create() {
+        return new HistoryDialog();
     }
 
-    public static HistoryDialog create(Fragment fragment) {
-        return new HistoryDialog(fragment);
-    }
-
-    public HistoryDialog type(int type) {
-        this.type = type;
+    public HistoryDialog vod() {
+        type = 0;
         return this;
     }
 
-    public HistoryDialog(Activity activity) {
-        this.callback = (ConfigCallback) activity;
-        this.full = true;
-        init(activity);
+    public HistoryDialog live() {
+        type = 1;
+        return this;
     }
 
-    public HistoryDialog(Fragment fragment) {
-        this.callback = (ConfigCallback) fragment;
-        init(fragment.requireActivity());
-    }
-
-    private void init(Activity activity) {
-        this.binding = DialogHistoryBinding.inflate(LayoutInflater.from(activity));
-        this.dialog = new MaterialAlertDialogBuilder(activity).setView(binding.getRoot()).create();
-        this.adapter = new ConfigAdapter(this);
+    public HistoryDialog wall() {
+        type = 2;
+        return this;
     }
 
     public HistoryDialog readOnly() {
-        this.readOnly = true;
+        readOnly = true;
         return this;
     }
 
-    public void show() {
-        setRecyclerView();
-        setDialog();
+    public void show(FragmentActivity activity) {
+        show(activity.getSupportFragmentManager(), null);
     }
 
-    private void setRecyclerView() {
+    public void show(Fragment fragment) {
+        show(fragment.getChildFragmentManager(), null);
+    }
+
+    private boolean isFull() {
+        return getParentFragment() == null;
+    }
+
+    @Override
+    public void onAttach(@NonNull Context context) {
+        super.onAttach(context);
+        listener = isFull() ? (ConfigListener) context : (ConfigListener) getParentFragment();
+    }
+
+    @Override
+    protected ViewBinding getBinding() {
+        return binding = DialogHistoryBinding.inflate(getLayoutInflater());
+    }
+
+    @Override
+    protected MaterialAlertDialogBuilder getBuilder() {
+        return builder().setView(getBinding().getRoot());
+    }
+
+    @Override
+    protected void initView() {
+        adapter = new ConfigAdapter(this);
         binding.recycler.setItemAnimator(null);
         binding.recycler.setHasFixedSize(false);
+        if (isFull()) binding.recycler.setMaxHeight(ResUtil.dp2px(264));
         binding.recycler.addItemDecoration(new SpaceItemDecoration(1, 8));
         binding.recycler.setAdapter(adapter.readOnly(readOnly).addAll(type));
-        if (full) binding.recycler.setMaxHeight(ResUtil.dp2px(264));
-    }
-
-    private void setDialog() {
-        if (adapter.getItemCount() == 0) return;
-        WindowManager.LayoutParams params = dialog.getWindow().getAttributes();
-        if (full && ResUtil.isLand(dialog.getContext())) params.width = (int) (ResUtil.getScreenWidth() * 0.5f);
-        dialog.getWindow().setAttributes(params);
-        dialog.getWindow().setDimAmount(0);
-        dialog.show();
     }
 
     @Override
     public void onTextClick(Config item) {
-        callback.setConfig(item);
-        dialog.dismiss();
+        listener.setConfig(item);
+        dismiss();
     }
 
     @Override
     public void onDeleteClick(Config item) {
-        if (adapter.remove(item) == 0) dialog.dismiss();
+        if (adapter.remove(item) == 0) dismiss();
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        if (adapter.getItemCount() == 0) dismiss();
+        else if (ResUtil.isLand(requireContext())) setWidth(0.5f);
     }
 }

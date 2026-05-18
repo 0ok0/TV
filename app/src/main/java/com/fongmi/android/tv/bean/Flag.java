@@ -35,7 +35,7 @@ public class Flag implements Parcelable, Diffable<Flag> {
     @SerializedName("episodes")
     private List<Episode> episodes;
 
-    private boolean activated;
+    private boolean selected;
     private int position;
 
     public Flag() {
@@ -54,7 +54,7 @@ public class Flag implements Parcelable, Diffable<Flag> {
         this.show = in.readString();
         this.urls = in.readString();
         this.episodes = in.createTypedArrayList(Episode.CREATOR);
-        this.activated = in.readByte() != 0;
+        this.selected = in.readByte() != 0;
         this.position = in.readInt();
     }
 
@@ -98,18 +98,18 @@ public class Flag implements Parcelable, Diffable<Flag> {
         }
     }
 
-    public boolean isActivated() {
-        return activated;
+    public boolean isSelected() {
+        return selected;
     }
 
-    public void setActivated(Flag item) {
-        this.activated = item.equals(this);
-        if (activated) item.episodes = episodes;
+    public void setSelected(Flag item) {
+        this.selected = item.equals(this);
+        if (selected) item.episodes = episodes;
     }
 
-    private void setActivated(Episode episode) {
+    private void setSelected(Episode episode) {
         setPosition(getEpisodes().indexOf(episode));
-        for (int i = 0; i < getEpisodes().size(); i++) getEpisodes().get(i).setActivated(i == getPosition());
+        for (int i = 0; i < getEpisodes().size(); i++) getEpisodes().get(i).setSelected(i == getPosition());
     }
 
     public int getPosition() {
@@ -120,9 +120,9 @@ public class Flag implements Parcelable, Diffable<Flag> {
         this.position = position;
     }
 
-    public void toggle(boolean activated, Episode episode) {
-        if (activated) setActivated(episode);
-        else getEpisodes().forEach(Episode::deactivated);
+    public void toggle(boolean selected, Episode episode) {
+        if (selected) setSelected(episode);
+        else getEpisodes().forEach(Episode::deselect);
     }
 
     public Episode find(String remarks, boolean strict) {
@@ -178,7 +178,7 @@ public class Flag implements Parcelable, Diffable<Flag> {
         dest.writeString(this.show);
         dest.writeString(this.urls);
         dest.writeTypedList(this.episodes);
-        dest.writeByte(this.activated ? (byte) 1 : (byte) 0);
+        dest.writeByte(this.selected ? (byte) 1 : (byte) 0);
         dest.writeInt(this.position);
     }
 

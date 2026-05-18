@@ -27,12 +27,12 @@ import com.fongmi.android.tv.dlna.DLNACastManager;
 import com.fongmi.android.tv.server.Server;
 import com.fongmi.android.tv.ui.activity.ScanActivity;
 import com.fongmi.android.tv.ui.adapter.DeviceAdapter;
+import com.fongmi.android.tv.ui.custom.SpaceItemDecoration;
 import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.android.tv.utils.ScanTask;
 import com.github.catvod.net.OkHttp;
 import com.github.catvod.utils.Path;
 import com.github.catvod.utils.Util;
-import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 
 import java.io.IOException;
 
@@ -42,7 +42,7 @@ import okhttp3.FormBody;
 import okhttp3.OkHttpClient;
 import okhttp3.Response;
 
-public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListener, ScanTask.Listener, DLNACastManager.DeviceListener, Callback {
+public class CastDialog extends BaseBottomSheetDialog implements DeviceAdapter.OnClickListener, ScanTask.Listener, DLNACastManager.DeviceListener, Callback {
 
     private final FormBody.Builder body;
     private final OkHttpClient client;
@@ -50,13 +50,8 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     private DialogDeviceBinding binding;
     private DeviceAdapter adapter;
     private ScanTask scanTask;
-    private Listener listener;
     private CastVideo video;
     private boolean fm;
-
-    public static CastDialog create() {
-        return new CastDialog();
-    }
 
     public CastDialog() {
         scanTask = new ScanTask(this);
@@ -64,6 +59,10 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
         body.add("device", Device.get().toString());
         body.add("config", Config.vod().toString());
         client = OkHttp.client(Constant.TIMEOUT_SYNC);
+    }
+
+    public static CastDialog create() {
+        return new CastDialog();
     }
 
     public CastDialog history(History history) {
@@ -87,9 +86,8 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     }
 
     public void show(FragmentActivity activity) {
-        for (Fragment f : activity.getSupportFragmentManager().getFragments()) if (f instanceof BottomSheetDialogFragment) return;
+        for (Fragment f : activity.getSupportFragmentManager().getFragments()) if (f instanceof CastDialog) return;
         show(activity.getSupportFragmentManager(), null);
-        this.listener = (Listener) activity;
     }
 
     @Override
@@ -115,11 +113,16 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     private void setRecyclerView() {
         binding.recycler.setHasFixedSize(false);
         binding.recycler.setAdapter(adapter = new DeviceAdapter(this));
+        binding.recycler.addItemDecoration(new SpaceItemDecoration(1, 16));
+    }
+
+    private void setRecyclerVisible() {
+        binding.recycler.setVisibility(adapter.getItemCount() > 0 ? View.VISIBLE : View.GONE);
     }
 
     private void getDevice() {
         adapter.setItems(Device.getAll(), () -> {
-            adapter.sort(DLNACastManager.get().getRegistered());
+            adapter.sort(DLNACastManager.get().getRegistered(), this::setRecyclerVisible);
             if (adapter.getItemCount() == 0) onRefresh();
             else DLNACastManager.get().search();
         });
@@ -133,18 +136,19 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
         adapter.clear(() -> {
             Device.delete();
             if (fm) scanTask.start();
-            adapter.sort(DLNACastManager.get().getRegistered());
             DLNACastManager.get().search();
+            adapter.sort(DLNACastManager.get().getRegistered(), this::setRecyclerVisible);
         });
     }
 
     private void onCasted() {
-        listener.onCasted();
+        ((CastDialog.Listener) requireActivity()).onCasted();
         dismiss();
     }
 
     @Override
     public void onDeviceAdded(Device device) {
+        binding.recycler.setVisibility(View.VISIBLE);
         adapter.sort(device);
     }
 
@@ -155,6 +159,7 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
 
     @Override
     public void onFind(Device device) {
+        binding.recycler.setVisibility(View.VISIBLE);
         adapter.sort(device);
     }
 

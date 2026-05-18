@@ -7,7 +7,7 @@
         android:topLeftRadius="8dp"
         android:topRightRadius="8dp" />
 
-    <solid android:color="#B3F44336" />
+    <solid android:color="@color/bg_site" />
 
     <padding
         android:bottom="4dp"

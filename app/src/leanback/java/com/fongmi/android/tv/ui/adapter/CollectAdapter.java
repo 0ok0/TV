@@ -7,7 +7,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.fongmi.android.tv.bean.Collect;
-import com.fongmi.android.tv.databinding.AdapterFilterBinding;
+import com.fongmi.android.tv.databinding.AdapterTypeBinding;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,20 +42,21 @@ public class CollectAdapter extends RecyclerView.Adapter<CollectAdapter.ViewHold
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        return new ViewHolder(AdapterFilterBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false));
+        return new ViewHolder(AdapterTypeBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false));
     }
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Collect item = mItems.get(position);
+        holder.binding.getRoot().setOnClickListener(null);
         holder.binding.text.setText(item.getSite().getName());
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
 
-        private final AdapterFilterBinding binding;
+        private final AdapterTypeBinding binding;
 
-        ViewHolder(@NonNull AdapterFilterBinding binding) {
+        ViewHolder(@NonNull AdapterTypeBinding binding) {
             super(binding.getRoot());
             this.binding = binding;
         }

@@ -1,6 +1,7 @@
 package com.fongmi.android.tv;
 
 import com.fongmi.android.tv.bean.Style;
+import com.fongmi.android.tv.setting.PlayerSetting;
 import com.fongmi.android.tv.utils.ResUtil;
 
 public class Product {
@@ -10,7 +11,7 @@ public class Product {
     }
 
     public static int getColumn() {
-        return Math.abs(Setting.getSize() - 7);
+        return Math.abs(PlayerSetting.getSize() - 7);
     }
 
     public static int getColumn(Style style) {

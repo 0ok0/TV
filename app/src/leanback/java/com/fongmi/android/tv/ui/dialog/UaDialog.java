@@ -1,21 +1,18 @@
 package com.fongmi.android.tv.ui.dialog;
 
-import android.content.DialogInterface;
 import android.text.TextUtils;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 
-import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.FragmentActivity;
+import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.R;
-import com.fongmi.android.tv.Setting;
 import com.fongmi.android.tv.databinding.DialogUaBinding;
 import com.fongmi.android.tv.event.ServerEvent;
-import com.fongmi.android.tv.impl.UaCallback;
+import com.fongmi.android.tv.impl.UaListener;
 import com.fongmi.android.tv.server.Server;
+import com.fongmi.android.tv.setting.Setting;
 import com.fongmi.android.tv.ui.custom.CustomTextListener;
 import com.fongmi.android.tv.utils.QRCode;
 import com.fongmi.android.tv.utils.ResUtil;
@@ -26,49 +23,36 @@ import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
-public class UaDialog implements DialogInterface.OnDismissListener {
+public class UaDialog extends BaseAlertDialog {
 
-    private final DialogUaBinding binding;
-    private final UaCallback callback;
-    private final AlertDialog dialog;
-    private boolean append;
+    private DialogUaBinding binding;
+    private boolean append = true;
 
-    public static UaDialog create(FragmentActivity activity) {
-        return new UaDialog(activity);
+    public static void show(FragmentActivity activity) {
+        new UaDialog().show(activity.getSupportFragmentManager(), null);
     }
 
-    public UaDialog(FragmentActivity activity) {
-        this.callback = (UaCallback) activity;
-        this.binding = DialogUaBinding.inflate(LayoutInflater.from(activity));
-        this.dialog = new MaterialAlertDialogBuilder(activity).setView(binding.getRoot()).create();
-        this.append = true;
+    @Override
+    protected ViewBinding getBinding() {
+        return binding = DialogUaBinding.inflate(getLayoutInflater());
     }
 
-    public void show() {
-        initDialog();
-        initView();
-        initEvent();
+    @Override
+    protected MaterialAlertDialogBuilder getBuilder() {
+        return builder().setView(getBinding().getRoot());
     }
 
-    private void initDialog() {
-        WindowManager.LayoutParams params = dialog.getWindow().getAttributes();
-        params.width = (int) (ResUtil.getScreenWidth() * 0.55f);
-        dialog.getWindow().setAttributes(params);
-        dialog.getWindow().setDimAmount(0);
-        dialog.setOnDismissListener(this);
-        dialog.show();
-    }
-
-    private void initView() {
+    @Override
+    protected void initView() {
         String text = Setting.getUa();
         binding.text.setText(text);
         binding.text.setSelection(TextUtils.isEmpty(text) ? 0 : text.length());
         binding.code.setImageBitmap(QRCode.getBitmap(Server.get().getAddress(3), 200, 0));
-        binding.info.setText(ResUtil.getString(R.string.push_info, Server.get().getAddress()).replace("，", "\n"));
+        binding.info.setText(ResUtil.getString(R.string.push_info, Server.get().getAddress()).replace("\uff0c", "\n"));
     }
 
-    private void initEvent() {
-        EventBus.getDefault().register(this);
+    @Override
+    protected void initEvent() {
         binding.positive.setOnClickListener(this::onPositive);
         binding.negative.setOnClickListener(this::onNegative);
         binding.text.addTextChangedListener(new CustomTextListener() {
@@ -98,12 +82,12 @@ public class UaDialog implements DialogInterface.OnDismissListener {
     }
 
     private void onPositive(View view) {
-        callback.setUa(binding.text.getText().toString().trim());
-        dialog.dismiss();
+        ((UaListener) requireActivity()).setUa(binding.text.getText().toString().trim());
+        dismiss();
     }
 
     private void onNegative(View view) {
-        dialog.dismiss();
+        dismiss();
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -114,7 +98,15 @@ public class UaDialog implements DialogInterface.OnDismissListener {
     }
 
     @Override
-    public void onDismiss(DialogInterface dialogInterface) {
+    public void onStart() {
+        super.onStart();
+        setWidth(0.55f);
+        EventBus.getDefault().register(this);
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
         EventBus.getDefault().unregister(this);
     }
 }

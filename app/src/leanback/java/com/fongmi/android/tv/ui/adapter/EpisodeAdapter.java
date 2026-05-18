@@ -39,7 +39,7 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
     }
 
     public int getPosition() {
-        for (int i = 0; i < mItems.size(); i++) if (mItems.get(i).isActivated()) return i;
+        for (int i = 0; i < mItems.size(); i++) if (mItems.get(i).isSelected()) return i;
         return 0;
     }
 
@@ -87,7 +87,7 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
         holder.binding.text.setMaxWidth(maxWidth);
         holder.binding.text.setNextFocusUpId(nextFocusUp);
         holder.binding.text.setNextFocusDownId(nextFocusDown);
-        holder.binding.text.setActivated(item.isActivated());
+        holder.binding.text.setSelected(item.isSelected());
         holder.binding.text.setText(item.getDesc().concat(item.getName()));
         holder.binding.getRoot().setOnClickListener(v -> mListener.onItemClick(item));
     }

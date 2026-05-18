@@ -113,7 +113,7 @@ public class Live {
     private boolean pass;
 
     @Ignore
-    private boolean activated;
+    private boolean selected;
 
     @Ignore
     private int width;
@@ -262,16 +262,16 @@ public class Live {
         this.pass = pass;
     }
 
-    public boolean isActivated() {
-        return activated;
+    public boolean isSelected() {
+        return selected;
     }
 
-    public void setActivated(boolean activated) {
-        this.activated = activated;
+    public void setSelected(boolean selected) {
+        this.selected = selected;
     }
 
-    public void setActivated(Live item) {
-        this.activated = item.equals(this);
+    public void setSelected(Live item) {
+        this.selected = item.equals(this);
     }
 
     public int getWidth() {

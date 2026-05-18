@@ -113,9 +113,9 @@ public class VodActivity extends BaseActivity implements TypeAdapter.OnClickList
     }
 
     private void onChildSelected(@Nullable RecyclerView.ViewHolder child) {
-        if (mOldView != null) mOldView.setActivated(false);
+        if (mOldView != null) mOldView.setSelected(false);
         if ((mOldView = child != null ? child.itemView : null) == null) return;
-        mOldView.setActivated(true);
+        mOldView.setSelected(true);
         App.post(mRunnable, 100);
     }
 

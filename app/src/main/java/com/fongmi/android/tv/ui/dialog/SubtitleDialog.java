@@ -12,17 +12,16 @@ import androidx.fragment.app.FragmentActivity;
 import androidx.media3.ui.SubtitleView;
 import androidx.viewbinding.ViewBinding;
 
-import com.fongmi.android.tv.Setting;
 import com.fongmi.android.tv.databinding.DialogSubtitleBinding;
+import com.fongmi.android.tv.setting.PlayerSetting;
 import com.fongmi.android.tv.utils.ResUtil;
+import com.fongmi.android.tv.utils.Util;
 import com.github.bassaer.library.MDColor;
-import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 
-public final class SubtitleDialog extends BaseDialog {
+public final class SubtitleDialog extends BaseBottomSheetDialog {
 
     private DialogSubtitleBinding binding;
     private SubtitleView subtitleView;
-    private boolean full;
 
     public static SubtitleDialog create() {
         return new SubtitleDialog();
@@ -33,19 +32,18 @@ public final class SubtitleDialog extends BaseDialog {
         return this;
     }
 
-    public SubtitleDialog full(boolean full) {
-        this.full = full;
-        return this;
+    public void show(FragmentActivity activity) {
+        for (Fragment f : activity.getSupportFragmentManager().getFragments()) if (f instanceof SubtitleDialog) return;
+        show(activity.getSupportFragmentManager(), null);
     }
 
-    public void show(FragmentActivity activity) {
-        for (Fragment f : activity.getSupportFragmentManager().getFragments()) if (f instanceof BottomSheetDialogFragment) return;
-        show(activity.getSupportFragmentManager(), null);
+    private boolean isFull() {
+        return Util.isFullscreen(getActivity());
     }
 
     @Override
     protected boolean transparent() {
-        return full;
+        return isFull();
     }
 
     @Override
@@ -56,24 +54,48 @@ public final class SubtitleDialog extends BaseDialog {
     @Override
     protected void initView() {
         int count = binding.getRoot().getChildCount();
-        if (full) for (int i = 0; i < count; i++) ((ImageView) binding.getRoot().getChildAt(i)).getDrawable().setTint(MDColor.WHITE);
+        if (isFull()) for (int i = 0; i < count; i++) ((ImageView) binding.getRoot().getChildAt(i)).getDrawable().setTint(MDColor.WHITE);
     }
 
     @Override
     protected void initEvent() {
+        binding.up.setOnClickListener(this::onUp);
+        binding.down.setOnClickListener(this::onDown);
+        binding.large.setOnClickListener(this::onLarge);
+        binding.small.setOnClickListener(this::onSmall);
         binding.reset.setOnClickListener(this::onReset);
     }
 
+    private void onUp(View view) {
+        subtitleView.addPosition(0.005f);
+        PlayerSetting.putSubtitlePosition(subtitleView.getPosition());
+    }
+
+    private void onDown(View view) {
+        subtitleView.subPosition(0.005f);
+        PlayerSetting.putSubtitlePosition(subtitleView.getPosition());
+    }
+
+    private void onLarge(View view) {
+        subtitleView.addTextSize(0.002f);
+        PlayerSetting.putSubtitleTextSize(subtitleView.getTextSize());
+    }
+
+    private void onSmall(View view) {
+        subtitleView.subTextSize(0.002f);
+        PlayerSetting.putSubtitleTextSize(subtitleView.getTextSize());
+    }
+
     private void onReset(View view) {
-        Setting.putSubtitleTextSize(0.0f);
-        Setting.putSubtitlePosition(0.0f);
+        PlayerSetting.putSubtitleTextSize(0.0f);
+        PlayerSetting.putSubtitlePosition(0.0f);
+        subtitleView.setBottomPosition(0.0f);
         subtitleView.setUserDefaultTextSize();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        if (full) setDimAmount(0.5f);
-        getDialog().getWindow().setLayout(ResUtil.dp2px(full ? 232 : 216), -1);
+        getDialog().getWindow().setLayout(ResUtil.dp2px(isFull() ? 232 : 216), -1);
     }
 }

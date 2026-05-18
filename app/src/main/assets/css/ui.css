@@ -80,7 +80,7 @@ html, body {
 
 .tab-panel { display: none; }
 .tab-panel.active { display: flex; flex-direction: column; justify-content: center; min-height: 100%; padding: 20px 16px; }
-#panel4.tab-panel.active { display: block; justify-content: unset; padding: 16px; }
+#panel5.tab-panel.active { display: block; justify-content: unset; padding: 16px; }
 .panel-content { display: flex; flex-direction: column; gap: 20px; width: 100%; }
 
 #file_uploader { display: none; }
@@ -318,6 +318,53 @@ html, body {
 }
 
 .md-dialog-body .md-input { margin-top: 8px; }
+
+.md-dialog-list {
+    padding: 8px 0 16px;
+}
+
+.md-dialog-list-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 24px;
+    font-size: 16px;
+    line-height: 24px;
+    color: var(--md-on-surface);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.md-dialog-list-item::before {
+    content: '';
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid var(--md-outline);
+    flex-shrink: 0;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.md-dialog-list-item::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--md-primary);
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.md-dialog-list-item:hover::after  { opacity: 0.08; }
+.md-dialog-list-item:active::after { opacity: 0.12; }
+
+.md-dialog-list-item.active { color: var(--md-primary); font-weight: 500; }
+
+.md-dialog-list-item.active::before {
+    border-color: var(--md-primary);
+    background: var(--md-primary);
+    box-shadow: inset 0 0 0 4px var(--md-surface-container-high);
+}
 
 .md-dialog-actions {
     display: flex;

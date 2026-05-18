@@ -6,6 +6,6 @@
     android:layout_height="wrap_content"
     android:background="@drawable/shape_item"
     android:gravity="center"
-    android:textColor="@color/text"
+    android:textColor="@color/selector_text"
     android:textSize="14sp"
     tools:text="泥巴" />

@@ -54,7 +54,7 @@ public class TrackAdapter extends RecyclerView.Adapter<TrackAdapter.ViewHolder> 
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Track item = mItems.get(position);
         holder.binding.text.setText(item.getName());
-        holder.binding.text.setActivated(item.isSelected());
+        holder.binding.text.setSelected(item.isSelected());
     }
 
     public class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {

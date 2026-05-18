@@ -3,6 +3,7 @@ package com.fongmi.android.tv.service;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.os.Binder;
+import android.os.Bundle;
 import android.os.IBinder;
 
 import androidx.annotation.NonNull;
@@ -16,7 +17,10 @@ import androidx.media3.session.LibraryResult;
 import androidx.media3.session.MediaLibraryService;
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession;
 import androidx.media3.session.MediaSession;
+import androidx.media3.session.SessionCommand;
+import androidx.media3.session.SessionCommands;
 import androidx.media3.session.SessionError;
+import androidx.media3.session.SessionResult;
 
 import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.BuildConfig;
@@ -44,6 +48,8 @@ import java.util.function.Consumer;
 public class PlaybackService extends MediaLibraryService implements MediaLibrarySession.Callback, PlayerManager.Callback {
 
     public static final String LOCAL_BIND_ACTION = BuildConfig.APPLICATION_ID.concat(".LOCAL_BIND");
+
+    private static final SessionCommand COMMAND_REPEAT = new SessionCommand(ActionEvent.REPEAT, Bundle.EMPTY);
 
     private static volatile boolean running;
 
@@ -97,13 +103,17 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
 
     private void setupNotification() {
         DefaultMediaNotificationProvider provider = new DefaultMediaNotificationProvider.Builder(this).build();
-        session.setMediaButtonPreferences(ImmutableList.of(buildStopButton()));
+        session.setMediaButtonPreferences(ImmutableList.of(buildRepeatButton(), buildStopButton()));
         provider.setSmallIcon(R.drawable.ic_notification);
         setMediaNotificationProvider(provider);
     }
 
     private CommandButton buildStopButton() {
-        return new CommandButton.Builder(CommandButton.ICON_STOP).setPlayerCommand(Player.COMMAND_STOP).setDisplayName(getString(androidx.media3.ui.R.string.exo_controls_stop_description)).build();
+        return new CommandButton.Builder(CommandButton.ICON_STOP).setPlayerCommand(Player.COMMAND_STOP).setDisplayName(getString(R.string.play_stop)).build();
+    }
+
+    private CommandButton buildRepeatButton() {
+        return new CommandButton.Builder(player.isRepeatOne() ? CommandButton.ICON_REPEAT_ONE : CommandButton.ICON_REPEAT_OFF).setSessionCommand(COMMAND_REPEAT).setDisplayName(getString(R.string.play_repeat)).build();
     }
 
     @Override
@@ -118,8 +128,8 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
         else if (ActionEvent.PREV.equals(action)) dispatchPrev();
         else if (ActionEvent.NEXT.equals(action)) dispatchNext();
         else if (ActionEvent.STOP.equals(action)) dispatchStop();
-        else if (ActionEvent.LOOP.equals(action)) dispatchLoop();
         else if (ActionEvent.AUDIO.equals(action)) dispatchAudio();
+        else if (ActionEvent.REPEAT.equals(action)) dispatchRepeat();
         else if (ActionEvent.REPLAY.equals(action)) dispatchReplay();
     }
 
@@ -160,6 +170,7 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
     public void onDestroy() {
         running = false;
         releaseSession();
+        player.stop();
         player.release();
         removeForeground();
         Server.get().setService(null);
@@ -169,7 +180,7 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
 
     private void stopAndClear() {
         player.stop();
-        exoPlayer.clearMediaItems();
+        player.clearMediaItems();
     }
 
     public void suspend() {
@@ -207,7 +218,7 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
 
     private void saveProgress() {
         if (hasNavigationCallback() || session == null) return;
-        if (BrowseTree.saveProgress(exoPlayer.getCurrentPosition(), exoPlayer.getDuration())) {
+        if (BrowseTree.saveProgress(player.getPosition(), player.getDuration())) {
             session.notifyChildrenChanged("VOD", 0, null);
         }
     }
@@ -233,7 +244,18 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
     @NonNull
     @Override
     public MediaSession.ConnectionResult onConnect(@NonNull MediaSession session, @NonNull MediaSession.ControllerInfo controller) {
-        return new MediaLibrarySession.ConnectionResult.AcceptedResultBuilder(session).build();
+        SessionCommands commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon().add(COMMAND_REPEAT).build();
+        return new MediaLibrarySession.ConnectionResult.AcceptedResultBuilder(session).setAvailableSessionCommands(commands).build();
+    }
+
+    @NonNull
+    @Override
+    public ListenableFuture<SessionResult> onCustomCommand(@NonNull MediaSession session, @NonNull MediaSession.ControllerInfo controller, @NonNull SessionCommand customCommand, @NonNull Bundle args) {
+        if (COMMAND_REPEAT.customAction.equals(customCommand.customAction)) {
+            dispatchRepeat();
+            return Futures.immediateFuture(new SessionResult(SessionResult.RESULT_SUCCESS));
+        }
+        return MediaLibrarySession.Callback.super.onCustomCommand(session, controller, customCommand, args);
     }
 
     public boolean hasExternalClient() {
@@ -283,20 +305,20 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
     }
 
     public void dispatchStop() {
-        if (exoPlayer.getPlaybackState() == Player.STATE_IDLE) return;
+        if (player.getPlaybackState() == Player.STATE_IDLE) return;
         if (hasNavigationCallback() && isNavigationOwner()) dispatch(NavigationCallback::onStop);
         else stopAndClear();
     }
 
-    public void dispatchLoop() {
-        dispatch(NavigationCallback::onLoop);
+    public void dispatchRepeat() {
+        player.setRepeatOne(!player.isRepeatOne());
     }
 
     public void dispatchReplay() {
         if (hasNavigationCallback() && isNavigationOwner()) dispatch(NavigationCallback::onReplay);
         else {
-            exoPlayer.seekTo(0);
-            exoPlayer.play();
+            player.seekTo(0);
+            player.play();
         }
     }
 
@@ -310,7 +332,7 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
     }
 
     private void navigateItem(int delta) {
-        MediaItem current = exoPlayer.getCurrentMediaItem();
+        MediaItem current = player.getCurrentMediaItem();
         if (current == null) return;
         Task.submit(() -> {
             try {
@@ -318,7 +340,7 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
                 if (next == null || next.localConfiguration == null) return;
                 Result result = BrowseTree.consumeBrowseResult(next.mediaId);
                 if (result == null || !isRunning()) return;
-                App.post(() -> startBrowse(player, next, result, 0));
+                App.post(() -> startBrowse(next, result, 0));
             } catch (Exception ignored) {
             }
         });
@@ -400,7 +422,7 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
             @NonNull
             @Override
             public Commands getAvailableCommands() {
-                return super.getAvailableCommands().buildUpon().add(COMMAND_SEEK_TO_PREVIOUS).add(COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM).add(COMMAND_SEEK_TO_NEXT).add(COMMAND_SEEK_TO_NEXT_MEDIA_ITEM).add(COMMAND_SEEK_BACK).add(COMMAND_SEEK_FORWARD).add(COMMAND_STOP).build();
+                return super.getAvailableCommands().buildUpon().add(COMMAND_SEEK_TO_PREVIOUS).add(COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM).add(COMMAND_SEEK_TO_NEXT).add(COMMAND_SEEK_TO_NEXT_MEDIA_ITEM).add(COMMAND_SEEK_BACK).add(COMMAND_SEEK_FORWARD).add(COMMAND_STOP).add(COMMAND_SET_REPEAT_MODE).build();
             }
         };
     }
@@ -408,12 +430,12 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
     private void playViaManager(MediaItem item, long startPositionMs) {
         if (item == null || item.localConfiguration == null) return;
         Result result = BrowseTree.consumeBrowseResult(item.mediaId);
-        if (result != null) startBrowse(player, item, result, startPositionMs);
+        if (result != null) startBrowse(item, result, startPositionMs);
     }
 
-    private void startBrowse(PlayerManager manager, MediaItem item, Result result, long startPositionMs) {
-        manager.startBrowse(PlaySpec.from(result, item.mediaId, item.mediaMetadata));
-        if (startPositionMs > 0) manager.seekTo(startPositionMs);
+    private void startBrowse(MediaItem item, Result result, long startPositionMs) {
+        player.browse(PlaySpec.from(result, item.mediaId, item.mediaMetadata));
+        if (startPositionMs > 0) player.seekTo(startPositionMs);
     }
 
     @Override
@@ -449,6 +471,11 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
         @Override
         public void onPlaybackStateChanged(int state) {
             if (state == Player.STATE_ENDED && !(hasNavigationCallback() && isNavigationOwner())) navigateItem(1);
+        }
+
+        @Override
+        public void onRepeatModeChanged(int repeatMode) {
+            if (session != null) session.setMediaButtonPreferences(ImmutableList.of(buildRepeatButton(), buildStopButton()));
         }
     };
 
@@ -526,9 +553,6 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
         }
 
         default void onStop() {
-        }
-
-        default void onLoop() {
         }
 
         default void onReplay() {

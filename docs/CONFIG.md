@@ -50,6 +50,7 @@ Vod 配置為一個 JSON 物件，作為應用程式的主要配置入口。配�
 | `hosts`     | `array<string>` | DNS 解析覆蓋規則。詳見 [hosts](#hosts--dns-解析覆蓋)。                       |
 | `flags`     | `array<string>` | 平台標示旗標，用於標記特殊平台處理（如 `"qq"`）。                                   |
 | `ads`       | `array<string>` | 廣告域名過濾清單，符合的請求將被攔截。詳見 [ads](#ads--廣告過濾)。                       |
+| `danmaku`   | `string`        | 彈幕 API URL，用於自動搜尋彈幕。詳見 [danmaku](#danmaku--彈幕-api)。            |
 
 ---
 
@@ -357,27 +358,29 @@ scheme://username:password@host:port
 **範例：**
 
 ```json
-[
-  {
-    "name": "指定域名代理",
-    "hosts": [
-      "googlevideo.com",
-      "raw.githubusercontent.com"
-    ],
-    "urls": [
-      "http://127.0.0.1:7890"
-    ]
-  },
-  {
-    "name": "全域代理",
-    "hosts": [
-      ".*"
-    ],
-    "urls": [
-      "socks5://127.0.0.1:7891"
-    ]
-  }
-]
+{
+  "proxy": [
+    {
+      "name": "指定域名代理",
+      "hosts": [
+        "googlevideo.com",
+        "raw.githubusercontent.com"
+      ],
+      "urls": [
+        "http://127.0.0.1:7890"
+      ]
+    },
+    {
+      "name": "全域代理",
+      "hosts": [
+        ".*"
+      ],
+      "urls": [
+        "socks5://127.0.0.1:7891"
+      ]
+    }
+  ]
+}
 ```
 
 ---
@@ -397,27 +400,29 @@ scheme://username:password@host:port
 **範例：**
 
 ```json
-[
-  {
-    "hosts": [
-      "video.example.com"
-    ],
-    "regex": [
-      "m3u8?token="
-    ],
-    "exclude": [
-      "preview.json"
-    ]
-  },
-  {
-    "hosts": [
-      "ads.example.com"
-    ],
-    "script": [
-      "document.querySelector('.close-btn').click()"
-    ]
-  }
-]
+{
+  "rules": [
+    {
+      "hosts": [
+        "video.example.com"
+      ],
+      "regex": [
+        "m3u8?token="
+      ],
+      "exclude": [
+        "preview.json"
+      ]
+    },
+    {
+      "hosts": [
+        "ads.example.com"
+      ],
+      "script": [
+        "document.querySelector('.close-btn').click()"
+      ]
+    }
+  ]
+}
 ```
 
 ---
@@ -573,6 +578,47 @@ scheme://username:password@host:port
   }
 }
 ```
+
+---
+
+## danmaku — 彈幕 API
+
+`danmaku` 為 VodConfig 頂層字串欄位，指定彈幕搜尋接口。
+
+### GET 模式（含佔位符）
+
+URL 含 `{name}` 或 `{episode}` 時，以 GET 請求發送，佔位符在請求前替換：
+
+| 佔位符         | 說明   |
+|-------------|------|
+| `{name}`    | 劇集名稱 |
+| `{episode}` | 集數名稱 |
+
+```
+https://example.com/danmaku?name={name}&episode={episode}
+```
+
+### POST 模式（不含佔位符）
+
+URL 不含任何佔位符時，改以 POST 請求發送，`name`/`episode` 作為 form 欄位傳入：
+
+```
+https://example.com/danmaku
+```
+
+POST body：`name=劇集名稱&episode=集數名稱`
+
+### 回應格式
+
+接口須回傳 JSON 陣列，每個元素為一個彈幕來源物件。
+
+### 自動搜尋條件
+
+- 設定中「彈幕載入」已開啟（`DanmakuSetting.isLoad()`）
+- 設定中「自動載入」已開啟（`DanmakuSetting.isAuto()`）
+- 彈幕接口不為空（使用者自訂優先，否則取此欄位）
+
+> **提示：** 使用者也可在設定頁自訂彈幕接口，會優先覆蓋此處的設定。
 
 ---
 

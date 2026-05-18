@@ -33,7 +33,7 @@ public class ParseAdapter extends RecyclerView.Adapter<ParseAdapter.ViewHolder> 
     }
 
     public int getPosition() {
-        for (int i = 0; i < mItems.size(); i++) if (mItems.get(i).isActivated()) return i;
+        for (int i = 0; i < mItems.size(); i++) if (mItems.get(i).isSelected()) return i;
         return 0;
     }
 
@@ -90,7 +90,7 @@ public class ParseAdapter extends RecyclerView.Adapter<ParseAdapter.ViewHolder> 
 
         void initView(TextView view, Parse item) {
             view.setText(item.getName());
-            view.setActivated(item.isActivated());
+            view.setSelected(item.isSelected());
             view.setOnClickListener(v -> listener.onItemClick(item));
         }
     }

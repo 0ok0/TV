@@ -5,14 +5,14 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:padding="24dp"
     tools:background="@color/white">
 
     <com.google.android.material.textview.MaterialTextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/control_speed"
-        android:textColor="?android:attr/textColorPrimary"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="16sp" />
 
     <com.google.android.material.slider.Slider
@@ -24,9 +24,7 @@
         android:stepSize="0.25"
         android:valueFrom="0.5"
         android:valueTo="5"
-        app:tickColor="@color/accent"
-        app:tickVisible="false"
-        app:trackColorInactive="@color/blue_50" />
+        app:tickVisible="false" />
 
     <com.google.android.material.textview.MaterialTextView
         android:id="@+id/parseText"
@@ -34,7 +32,7 @@
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"
         android:text="@string/parse"
-        android:textColor="?android:attr/textColorPrimary"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="16sp"
         android:visibility="gone"
         tools:visibility="visible" />
@@ -44,7 +42,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="16dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:orientation="horizontal"
+        android:overScrollMode="never"
         android:visibility="gone"
         app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
         tools:itemCount="5"
@@ -56,7 +57,7 @@
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"
         android:text="@string/control_scale"
-        android:textColor="?android:attr/textColorPrimary"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="16sp" />
 
     <HorizontalScrollView
@@ -77,7 +78,7 @@
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/shape_accent"
                 android:tag="0"
-                android:textColor="@color/control"
+                android:textColor="@color/selector_control"
                 android:textSize="14sp"
                 tools:text="預設" />
 
@@ -88,7 +89,7 @@
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/shape_accent"
                 android:tag="1"
-                android:textColor="@color/control"
+                android:textColor="@color/selector_control"
                 android:textSize="14sp"
                 tools:text="16:9" />
 
@@ -99,7 +100,7 @@
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/shape_accent"
                 android:tag="2"
-                android:textColor="@color/control"
+                android:textColor="@color/selector_control"
                 android:textSize="14sp"
                 tools:text="4:3" />
 
@@ -110,7 +111,7 @@
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/shape_accent"
                 android:tag="3"
-                android:textColor="@color/control"
+                android:textColor="@color/selector_control"
                 android:textSize="14sp"
                 tools:text="填充" />
 
@@ -120,7 +121,7 @@
                 android:layout_height="wrap_content"
                 android:background="@drawable/shape_accent"
                 android:tag="4"
-                android:textColor="@color/control"
+                android:textColor="@color/selector_control"
                 android:textSize="14sp"
                 tools:text="裁剪" />
 
@@ -133,7 +134,7 @@
         android:layout_marginTop="16dp"
         android:layout_marginBottom="8dp"
         android:text="@string/play"
-        android:textColor="?android:attr/textColorPrimary"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="16sp" />
 
     <HorizontalScrollView
@@ -153,7 +154,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/shape_accent"
-                android:textColor="@color/control"
+                android:textColor="@color/selector_control"
                 android:textSize="14sp"
                 tools:text="EXO" />
 
@@ -163,7 +164,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/shape_accent"
-                android:textColor="@color/control"
+                android:textColor="@color/selector_control"
                 android:textSize="14sp"
                 tools:text="硬解" />
 
@@ -173,7 +174,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/shape_accent"
-                android:textColor="@color/control"
+                android:textColor="@color/selector_control"
                 android:textSize="14sp"
                 tools:text="片頭" />
 
@@ -183,7 +184,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/shape_accent"
-                android:textColor="@color/control"
+                android:textColor="@color/selector_control"
                 android:textSize="14sp"
                 tools:text="片尾" />
 
@@ -193,7 +194,7 @@
                 android:layout_height="wrap_content"
                 android:background="@drawable/shape_accent"
                 android:text="@string/play_title"
-                android:textColor="@color/control"
+                android:textColor="@color/selector_control"
                 android:textSize="14sp"
                 android:visibility="gone"
                 tools:visibility="visible" />
@@ -208,7 +209,7 @@
         android:layout_marginTop="16dp"
         android:layout_marginBottom="8dp"
         android:text="@string/control_track"
-        android:textColor="?android:attr/textColorPrimary"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="16sp"
         android:visibility="gone"
         tools:visibility="visible" />
@@ -226,7 +227,7 @@
             android:background="@drawable/shape_accent"
             android:tag="3"
             android:text="@string/play_track_text"
-            android:textColor="@color/control"
+            android:textColor="@color/selector_control"
             android:textSize="14sp"
             android:visibility="gone"
             tools:visibility="visible" />
@@ -239,7 +240,7 @@
             android:background="@drawable/shape_accent"
             android:tag="1"
             android:text="@string/play_track_audio"
-            android:textColor="@color/control"
+            android:textColor="@color/selector_control"
             android:textSize="14sp"
             android:visibility="gone"
             tools:visibility="visible" />
@@ -251,7 +252,7 @@
             android:background="@drawable/shape_accent"
             android:tag="2"
             android:text="@string/play_track_video"
-            android:textColor="@color/control"
+            android:textColor="@color/selector_control"
             android:textSize="14sp"
             android:visibility="gone"
             tools:visibility="visible" />
@@ -265,7 +266,7 @@
         android:layout_marginTop="16dp"
         android:layout_marginBottom="8dp"
         android:text="@string/control_other"
-        android:textColor="?android:attr/textColorPrimary"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="16sp" />
 
     <androidx.appcompat.widget.LinearLayoutCompat
@@ -280,19 +281,19 @@
             android:layout_marginEnd="8dp"
             android:background="@drawable/shape_accent"
             android:text="@string/danmaku"
-            android:textColor="@color/control"
+            android:textColor="@color/selector_control"
             android:textSize="14sp"
             android:visibility="gone"
             tools:visibility="visible" />
 
         <com.google.android.material.textview.MaterialTextView
-            android:id="@+id/loop"
+            android:id="@+id/repeat"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
             android:background="@drawable/shape_accent"
-            android:text="@string/play_loop"
-            android:textColor="@color/control"
+            android:text="@string/play_repeat"
+            android:textColor="@color/selector_control"
             android:textSize="14sp" />
 
         <com.google.android.material.textview.MaterialTextView
@@ -301,7 +302,7 @@
             android:layout_height="wrap_content"
             android:background="@drawable/shape_accent"
             android:text="@string/play_timer"
-            android:textColor="@color/control"
+            android:textColor="@color/selector_control"
             android:textSize="14sp" />
 
     </androidx.appcompat.widget.LinearLayoutCompat>

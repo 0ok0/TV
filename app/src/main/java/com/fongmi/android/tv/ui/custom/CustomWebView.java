@@ -19,10 +19,10 @@ import androidx.annotation.NonNull;
 
 import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.Constant;
-import com.fongmi.android.tv.Setting;
 import com.fongmi.android.tv.api.config.RuleConfig;
 import com.fongmi.android.tv.api.config.VodConfig;
 import com.fongmi.android.tv.impl.ParseCallback;
+import com.fongmi.android.tv.setting.Setting;
 import com.fongmi.android.tv.ui.dialog.WebDialog;
 import com.fongmi.android.tv.utils.Sniffer;
 import com.github.catvod.crawler.Spider;
@@ -156,7 +156,7 @@ public class CustomWebView extends WebView implements DialogInterface.OnDismissL
     private void showDialog() {
         if (dialog != null || App.activity() == null) return;
         if (getParent() != null) ((ViewGroup) getParent()).removeView(this);
-        dialog = new WebDialog(this).show();
+        dialog = WebDialog.create(this).show();
         App.removeCallbacks(timer);
     }
 

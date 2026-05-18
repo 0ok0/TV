@@ -11,7 +11,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:letterSpacing="0.02"
-        android:textColor="@color/grey_900"
+        android:textColor="@color/white"
         android:textSize="18sp"
         tools:text="@string/update_version" />
 
@@ -20,7 +20,7 @@
         android:layout_height="1dp"
         android:layout_marginTop="16dp"
         android:layout_marginBottom="16dp"
-        android:background="@color/grey_300" />
+        android:background="?attr/colorOutlineVariant" />
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
@@ -34,7 +34,7 @@
             android:layout_height="wrap_content"
             android:letterSpacing="0.02"
             android:lineSpacingExtra="8dp"
-            android:textColor="@color/grey_900"
+            android:textColor="@color/white"
             android:textSize="16sp"
             tools:text="1. 新增 ffmpeg 音頻軟解\n2. 詳情頁新增分詞快搜\n3. 修復搜尋閃退問題\n4. 設定支援渲染切換" />
 
@@ -51,7 +51,7 @@
             android:layout_height="wrap_content"
             android:layout_marginEnd="16dp"
             android:layout_weight="1"
-            android:background="@drawable/selector_text"
+            android:background="@drawable/selector_button"
             android:focusable="true"
             android:focusableInTouchMode="true"
             android:gravity="center"
@@ -63,7 +63,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:background="@drawable/selector_text"
+            android:background="@drawable/selector_button"
             android:focusable="true"
             android:focusableInTouchMode="true"
             android:gravity="center"

@@ -24,7 +24,6 @@ public class Episode implements Parcelable, Diffable<Episode> {
 
     private int index;
     private int number;
-    private boolean activated;
     private boolean selected;
 
     private Episode(String name, String desc, String url) {
@@ -42,7 +41,6 @@ public class Episode implements Parcelable, Diffable<Episode> {
         this.desc = in.readString();
         this.url = in.readString();
         this.number = in.readInt();
-        this.activated = in.readByte() != 0;
         this.selected = in.readByte() != 0;
     }
 
@@ -82,25 +80,16 @@ public class Episode implements Parcelable, Diffable<Episode> {
         return number;
     }
 
-    public boolean isActivated() {
-        return activated;
-    }
-
-    public void setActivated(boolean activated) {
-        this.activated = activated;
-        this.selected = activated;
-    }
-
-    public void deactivated() {
-        setActivated(false);
-    }
-
     public boolean isSelected() {
         return selected;
     }
 
     public void setSelected(boolean selected) {
         this.selected = selected;
+    }
+
+    public void deselect() {
+        setSelected(false);
     }
 
     public int getScore(String name, int number) {
@@ -146,7 +135,6 @@ public class Episode implements Parcelable, Diffable<Episode> {
         dest.writeString(this.desc);
         dest.writeString(this.url);
         dest.writeInt(this.number);
-        dest.writeByte(this.activated ? (byte) 1 : (byte) 0);
         dest.writeByte(this.selected ? (byte) 1 : (byte) 0);
     }
 

@@ -1,53 +1,50 @@
 package com.fongmi.android.tv.ui.dialog;
 
-import android.view.LayoutInflater;
-
-import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.FragmentActivity;
+import androidx.viewbinding.ViewBinding;
 
-import com.fongmi.android.tv.Setting;
 import com.fongmi.android.tv.databinding.DialogSpeedBinding;
-import com.fongmi.android.tv.impl.SpeedCallback;
+import com.fongmi.android.tv.impl.SpeedListener;
+import com.fongmi.android.tv.setting.PlayerSetting;
 import com.fongmi.android.tv.utils.KeyUtil;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
-public class SpeedDialog {
+public class SpeedDialog extends BaseAlertDialog {
 
-    private final DialogSpeedBinding binding;
-    private final SpeedCallback callback;
-    private final AlertDialog dialog;
+    private DialogSpeedBinding binding;
 
-    public static SpeedDialog create(FragmentActivity activity) {
-        return new SpeedDialog(activity);
+    public static void show(FragmentActivity activity) {
+        new SpeedDialog().show(activity.getSupportFragmentManager(), null);
     }
 
-    public SpeedDialog(FragmentActivity activity) {
-        this.callback = (SpeedCallback) activity;
-        this.binding = DialogSpeedBinding.inflate(LayoutInflater.from(activity));
-        this.dialog = new MaterialAlertDialogBuilder(activity).setView(binding.getRoot()).create();
+    @Override
+    protected ViewBinding getBinding() {
+        return binding = DialogSpeedBinding.inflate(getLayoutInflater());
     }
 
-    public void show() {
-        initDialog();
-        initView();
-        initEvent();
+    @Override
+    protected MaterialAlertDialogBuilder getBuilder() {
+        return builder().setView(getBinding().getRoot());
     }
 
-    private void initDialog() {
-        dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
-        dialog.show();
+    @Override
+    protected void initView() {
+        binding.slider.setValue(PlayerSetting.getSpeed());
     }
 
-    private void initView() {
-        binding.slider.setValue(Setting.getSpeed());
-    }
-
-    private void initEvent() {
-        binding.slider.addOnChangeListener((slider, value, fromUser) -> callback.setSpeed(value));
+    @Override
+    protected void initEvent() {
+        binding.slider.addOnChangeListener((slider, value, fromUser) -> ((SpeedListener) requireActivity()).setSpeed(value));
         binding.slider.setOnKeyListener((view, keyCode, event) -> {
             boolean enter = KeyUtil.isEnterKey(event);
-            if (enter) dialog.dismiss();
+            if (enter) dismiss();
             return enter;
         });
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        getDialog().getWindow().setBackgroundDrawableResource(android.R.color.transparent);
     }
 }

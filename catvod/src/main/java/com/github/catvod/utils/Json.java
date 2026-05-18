@@ -20,7 +20,7 @@ public class Json {
         try {
             return JsonParser.parseString(json);
         } catch (Throwable e) {
-            return new JsonObject();
+            return new JsonParser().parse(json);
         }
     }
 

@@ -56,8 +56,7 @@ public class LiveAdapter extends RecyclerView.Adapter<LiveAdapter.ViewHolder> {
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Live item = mItems.get(position);
         holder.binding.text.setText(item.getName());
-        holder.binding.text.setSelected(item.isActivated());
-        holder.binding.text.setActivated(item.isActivated());
+        holder.binding.text.setSelected(item.isSelected());
         holder.binding.boot.setImageResource(item.getBootIcon());
         holder.binding.pass.setImageResource(item.getPassIcon());
         holder.binding.boot.setVisibility(action ? View.VISIBLE : View.GONE);

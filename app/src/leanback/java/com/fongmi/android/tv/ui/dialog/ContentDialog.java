@@ -1,33 +1,47 @@
 package com.fongmi.android.tv.ui.dialog;
 
-import android.app.Activity;
-import android.view.LayoutInflater;
 import android.widget.TextView;
 
-import androidx.appcompat.app.AlertDialog;
+import androidx.fragment.app.FragmentActivity;
+import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.databinding.DialogContentBinding;
 import com.fongmi.android.tv.ui.custom.CustomMovement;
 import com.github.bassaer.library.MDColor;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
-public class ContentDialog {
+public class ContentDialog extends BaseAlertDialog {
 
-    public static void show(Activity activity, CharSequence content) {
-        new ContentDialog().create(activity, content);
+    private DialogContentBinding binding;
+    private CharSequence content;
+
+    public static ContentDialog create() {
+        return new ContentDialog();
     }
 
-    public void create(Activity activity, CharSequence content) {
-        DialogContentBinding binding = DialogContentBinding.inflate(LayoutInflater.from(activity));
-        AlertDialog dialog = new MaterialAlertDialogBuilder(activity).setView(binding.getRoot()).create();
-        dialog.getWindow().setDimAmount(0);
-        initView(binding.text, content);
-        dialog.show();
+    public ContentDialog content(CharSequence content) {
+        this.content = content;
+        return this;
     }
 
-    private void initView(TextView view, CharSequence content) {
-        view.setText(content, TextView.BufferType.SPANNABLE);
-        view.setLinkTextColor(MDColor.BLUE_500);
-        CustomMovement.bind(view);
+    public void show(FragmentActivity activity) {
+        show(activity.getSupportFragmentManager(), null);
+    }
+
+    @Override
+    protected ViewBinding getBinding() {
+        return binding = DialogContentBinding.inflate(getLayoutInflater());
+    }
+
+    @Override
+    protected MaterialAlertDialogBuilder getBuilder() {
+        return builder().setView(getBinding().getRoot());
+    }
+
+    @Override
+    protected void initView() {
+        binding.text.setText(content, TextView.BufferType.SPANNABLE);
+        binding.text.setLinkTextColor(MDColor.YELLOW_500);
+        CustomMovement.bind(binding.text);
     }
 }

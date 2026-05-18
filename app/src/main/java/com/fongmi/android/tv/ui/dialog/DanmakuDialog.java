@@ -17,12 +17,12 @@ import androidx.viewbinding.ViewBinding;
 import com.fongmi.android.tv.bean.Danmaku;
 import com.fongmi.android.tv.databinding.DialogDanmakuBinding;
 import com.fongmi.android.tv.player.PlayerManager;
+import com.fongmi.android.tv.setting.DanmakuSetting;
 import com.fongmi.android.tv.ui.adapter.DanmakuAdapter;
 import com.fongmi.android.tv.ui.custom.SpaceItemDecoration;
 import com.fongmi.android.tv.utils.FileChooser;
-import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 
-public final class DanmakuDialog extends BaseDialog implements DanmakuAdapter.OnClickListener {
+public final class DanmakuDialog extends BaseBottomSheetDialog implements DanmakuAdapter.OnClickListener {
 
     private final DanmakuAdapter adapter;
     private DialogDanmakuBinding binding;
@@ -42,7 +42,7 @@ public final class DanmakuDialog extends BaseDialog implements DanmakuAdapter.On
     }
 
     public void show(FragmentActivity activity) {
-        for (Fragment f : activity.getSupportFragmentManager().getFragments()) if (f instanceof BottomSheetDialogFragment) return;
+        for (Fragment f : activity.getSupportFragmentManager().getFragments()) if (f instanceof DanmakuDialog) return;
         show(activity.getSupportFragmentManager(), null);
     }
 
@@ -59,16 +59,29 @@ public final class DanmakuDialog extends BaseDialog implements DanmakuAdapter.On
         binding.recycler.addItemDecoration(new SpaceItemDecoration(1, 16));
         binding.recycler.post(() -> binding.recycler.scrollToPosition(adapter.getSelected()));
         binding.recycler.setVisibility(adapter.getItemCount() == 0 ? View.GONE : View.VISIBLE);
+        binding.search.setVisibility(player.getMetadata() == null || DanmakuSetting.getEffectiveApiUrl().isEmpty() ? View.GONE : View.VISIBLE);
     }
 
     @Override
     protected void initEvent() {
-        binding.choose.setOnClickListener(this::showChooser);
+        binding.search.setOnClickListener(this::onSearch);
+        binding.choose.setOnClickListener(this::onChoose);
+        binding.setting.setOnClickListener(this::onSetting);
     }
 
-    private void showChooser(View view) {
+    private void onSearch(View view) {
+        DanmakuSearchDialog.create().player(player).show(getActivity());
+        dismiss();
+    }
+
+    private void onChoose(View view) {
         FileChooser.from(launcher).show(new String[]{"text/*"});
         player.pause();
+    }
+
+    private void onSetting(View view) {
+        DanmakuSettingDialog.create().player(player).show(getActivity());
+        dismiss();
     }
 
     @Override

@@ -33,7 +33,7 @@ public class Parse implements Diffable<Parse> {
     @SerializedName("ext")
     private Ext ext;
 
-    private boolean activated;
+    private boolean selected;
     private String click;
 
     public static Parse objectFrom(JsonElement element) {
@@ -82,16 +82,16 @@ public class Parse implements Diffable<Parse> {
         return ext = ext == null ? new Ext() : ext;
     }
 
-    public boolean isActivated() {
-        return activated;
+    public boolean isSelected() {
+        return selected;
     }
 
-    public void setActivated(boolean activated) {
-        this.activated = activated;
+    public void setSelected(boolean selected) {
+        this.selected = selected;
     }
 
-    public void setActivated(Parse item) {
-        this.activated = item.equals(this);
+    public void setSelected(Parse item) {
+        this.selected = item.equals(this);
     }
 
     public String getClick() {
