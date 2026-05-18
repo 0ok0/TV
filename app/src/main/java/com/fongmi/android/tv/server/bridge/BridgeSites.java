@@ -22,9 +22,13 @@ public class BridgeSites {
     public static String register(JsonObject object) {
         String url = safeString(object, "configUrl");
         String spiderValue = safeString(object, "spider");
+        if (safeBool(object, "replace", false)) {
+            SITES.clear();
+            configUrl = "";
+            spider = "";
+        }
         if (!url.isEmpty()) configUrl = url;
         if (!spiderValue.isEmpty()) spider = spiderValue;
-        if (safeBool(object, "replace", false)) SITES.clear();
         JsonArray sites = object.has("sites") && object.get("sites").isJsonArray() ? object.getAsJsonArray("sites") : new JsonArray();
         for (JsonElement element : sites) {
             Site site = Site.objectFrom(element, spiderValue.isEmpty() ? spider : spiderValue);
