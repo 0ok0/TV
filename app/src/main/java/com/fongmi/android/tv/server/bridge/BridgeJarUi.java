@@ -48,8 +48,9 @@ public class BridgeJarUi {
 
     public static void bringHostToFront() {
         Activity activity = App.activity();
-        if (activity == null) return;
-        Intent intent = new Intent(activity, activity.getClass());
+        if (activity != null && !activity.isFinishing() && !activity.isDestroyed()) return;
+        Intent intent = App.get().getPackageManager().getLaunchIntentForPackage(App.get().getPackageName());
+        if (intent == null) return;
         intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
             App.get().startActivity(intent);

@@ -33,6 +33,7 @@ import com.fongmi.android.tv.impl.Callback;
 import com.fongmi.android.tv.player.Source;
 import com.fongmi.android.tv.receiver.ShortcutReceiver;
 import com.fongmi.android.tv.server.Server;
+import com.fongmi.android.tv.service.HeadlessServerService;
 import com.fongmi.android.tv.service.PlaybackService;
 import com.fongmi.android.tv.ui.base.BaseActivity;
 import com.fongmi.android.tv.ui.custom.FragmentStateManager;
@@ -78,6 +79,7 @@ public class HomeActivity extends BaseActivity implements NavigationBarView.OnIt
         orientation = getResources().getConfiguration().orientation;
         mBinding.navigation.setOnItemSelectedListener(this);
         PermissionUtil.requestNotify(this);
+        HeadlessServerService.start(this);
         initFragment(savedInstanceState);
         Updater.create().start(this);
         initConfig();
@@ -240,7 +242,6 @@ public class HomeActivity extends BaseActivity implements NavigationBarView.OnIt
         AppDatabase.backup();
         OkHttp.get().clear();
         Source.get().exit();
-        Server.get().stop();
         super.onDestroy();
     }
 }

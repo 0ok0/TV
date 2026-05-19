@@ -47,6 +47,7 @@ import com.fongmi.android.tv.model.SiteViewModel;
 import com.fongmi.android.tv.player.Source;
 import com.fongmi.android.tv.server.Server;
 import com.fongmi.android.tv.service.DLNARendererService;
+import com.fongmi.android.tv.service.HeadlessServerService;
 import com.fongmi.android.tv.service.PlaybackService;
 import com.fongmi.android.tv.ui.adapter.BaseDiffCallback;
 import com.fongmi.android.tv.ui.base.BaseActivity;
@@ -121,6 +122,7 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         mBinding.progressLayout.showProgress();
         PermissionUtil.requestNotify(this);
         DLNARendererService.start(this);
+        HeadlessServerService.start(this);
         Updater.create().start(this);
         setRecyclerView();
         setViewModel();
@@ -484,7 +486,6 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         AppDatabase.backup();
         OkHttp.get().clear();
         Source.get().exit();
-        Server.get().stop();
         super.onDestroy();
     }
 }
