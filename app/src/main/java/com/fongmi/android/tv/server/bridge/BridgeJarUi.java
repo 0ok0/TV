@@ -1,8 +1,9 @@
 package com.fongmi.android.tv.server.bridge;
 
+import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Rect;
 import android.util.DisplayMetrics;
 import android.text.TextUtils;
 import android.util.Base64;
@@ -20,45 +21,41 @@ import android.widget.TextView;
 import com.fongmi.android.tv.App;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.google.zxing.BarcodeFormat;
-import com.google.zxing.BinaryBitmap;
-import com.google.zxing.DecodeHintType;
-import com.google.zxing.MultiFormatReader;
-import com.google.zxing.RGBLuminanceSource;
-import com.google.zxing.ReaderException;
-import com.google.zxing.Result;
-import com.google.zxing.ResultPoint;
-import com.google.zxing.common.HybridBinarizer;
 
 import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-public class BridgeQr {
+public class BridgeJarUi {
 
     private static final long UI_TIMEOUT = 15000;
 
     public static JsonObject captureJarUi() {
-        return captureJarUi("");
-    }
-
-    public static JsonObject captureJarUi(String provider) {
         long deadline = System.currentTimeMillis() + UI_TIMEOUT;
         while (System.currentTimeMillis() < deadline) {
             JsonObject object = snapshot(true);
-            if (bool(object, "ok")) return autoAdvance(provider, object);
+            if (bool(object, "ok")) return object;
             sleep(250);
         }
         return error("jar_ui_missing", "未找到 Android Jar 弹窗，请确认 Jar 登录窗口已出现");
+    }
+
+    public static void bringHostToFront() {
+        Activity activity = App.activity();
+        if (activity == null) return;
+        Intent intent = new Intent(activity, activity.getClass());
+        intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            App.get().startActivity(intent);
+            sleep(2000);
+        } catch (Throwable ignored) {
+        }
     }
 
     public static JsonObject snapshot() {
@@ -141,36 +138,6 @@ public class BridgeQr {
         return waitAndClick(1500, "OK", "确定");
     }
 
-    private static JsonObject autoAdvance(String provider, JsonObject object) {
-        if (hasQr(object)) return object;
-        if (!TextUtils.isEmpty(provider) && clickButton(providerAliases(provider))) {
-            sleep(700);
-            object = snapshot(true);
-            if (hasQr(object)) return object;
-        }
-        if (clickButton("扫码", "二维码")) {
-            sleep(1200);
-            object = snapshot(true);
-        }
-        return object;
-    }
-
-    private static String[] providerAliases(String provider) {
-        switch (provider == null ? "" : provider.toLowerCase(Locale.ROOT)) {
-            case "quark": return new String[]{"夸克", "夸父", "quark"};
-            case "uc": return new String[]{"优汐", "UC", "uc"};
-            case "ali": return new String[]{"阿里", "阿狸", "ali"};
-            case "baidu": return new String[]{"百度", "baidu", "bd"};
-            case "115": return new String[]{"115"};
-            case "123pan": return new String[]{"123", "123盘", "123pan"};
-            default: return new String[]{"网盘", "云盘"};
-        }
-    }
-
-    private static boolean hasQr(JsonObject object) {
-        return object != null && object.has("qr") && object.get("qr").isJsonObject();
-    }
-
     public static boolean dismiss() {
         if (clickOk()) return true;
         AtomicReference<Boolean> result = new AtomicReference<>(false);
@@ -210,130 +177,11 @@ public class BridgeQr {
             JsonArray elements = new JsonArray();
             collectElements(root.view, root.view, "", elements);
             object.add("elements", elements);
-            JsonObject qr = extractQr(root.view, bitmap);
-            if (qr != null) object.add("qr", qr);
             addTransient(object);
             result.set(object);
         });
         JsonObject object = result.get();
         return object == null ? error("jar_ui_capture_failed", "Android Jar 弹窗截图失败") : object;
-    }
-
-    private static JsonObject extractQr(View root, Bitmap bitmap) {
-        if (root == null || bitmap == null) return null;
-        List<Rect> candidates = new ArrayList<>();
-        collectQrCandidateBounds(root, root, candidates);
-        Rect fallbackRect = null;
-        Bitmap fallbackCrop = null;
-        for (Rect rect : candidates) {
-            Bitmap crop = crop(bitmap, rect, true);
-            if (crop == null) continue;
-            Result result = decodeQr(crop);
-            if (result != null) return qrObject(crop, rect, result);
-            if (fallbackCrop == null || crop.getWidth() * crop.getHeight() > fallbackCrop.getWidth() * fallbackCrop.getHeight()) {
-                fallbackRect = rect;
-                fallbackCrop = crop;
-            }
-        }
-        Result result = decodeQr(bitmap);
-        if (result == null) return fallbackCrop != null && hasLoginCue(root) ? qrObject(fallbackCrop, fallbackRect, null) : null;
-        Rect rect = boundsFromPoints(result.getResultPoints(), bitmap.getWidth(), bitmap.getHeight());
-        Bitmap crop = crop(bitmap, rect, true);
-        return crop == null ? null : qrObject(crop, rect, result);
-    }
-
-    private static JsonObject qrObject(Bitmap bitmap, Rect rect, Result result) {
-        JsonObject object = new JsonObject();
-        object.addProperty("image", dataUrl(bitmap));
-        object.addProperty("width", bitmap.getWidth());
-        object.addProperty("height", bitmap.getHeight());
-        object.addProperty("x", rect == null ? 0 : rect.left);
-        object.addProperty("y", rect == null ? 0 : rect.top);
-        object.addProperty("decoded", result != null);
-        if (result != null && !TextUtils.isEmpty(result.getText())) object.addProperty("content", result.getText());
-        return object;
-    }
-
-    private static void collectQrCandidateBounds(View root, View view, List<Rect> candidates) {
-        if (view == null || !view.isShown()) return;
-        if (view instanceof ImageView && looksLikeQrImage(view)) {
-            int left = relativeX(root, view);
-            int top = relativeY(root, view);
-            candidates.add(new Rect(left, top, left + view.getWidth(), top + view.getHeight()));
-        }
-        if (view instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) view;
-            for (int index = 0; index < group.getChildCount(); index++) collectQrCandidateBounds(root, group.getChildAt(index), candidates);
-        }
-    }
-
-    private static Result decodeQr(Bitmap bitmap) {
-        if (bitmap == null || bitmap.getWidth() <= 0 || bitmap.getHeight() <= 0) return null;
-        int width = bitmap.getWidth();
-        int height = bitmap.getHeight();
-        int[] pixels = new int[width * height];
-        bitmap.getPixels(pixels, 0, width, 0, 0, width, height);
-        try {
-            RGBLuminanceSource source = new RGBLuminanceSource(width, height, pixels);
-            BinaryBitmap binary = new BinaryBitmap(new HybridBinarizer(source));
-            MultiFormatReader reader = new MultiFormatReader();
-            Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
-            hints.put(DecodeHintType.POSSIBLE_FORMATS, Collections.singletonList(BarcodeFormat.QR_CODE));
-            hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
-            hints.put(DecodeHintType.CHARACTER_SET, "UTF-8");
-            return reader.decode(binary, hints);
-        } catch (ReaderException ignored) {
-            return null;
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
-
-    private static Rect boundsFromPoints(ResultPoint[] points, int width, int height) {
-        if (points == null || points.length == 0) return new Rect(0, 0, width, height);
-        float minX = width;
-        float minY = height;
-        float maxX = 0;
-        float maxY = 0;
-        for (ResultPoint point : points) {
-            if (point == null) continue;
-            minX = Math.min(minX, point.getX());
-            minY = Math.min(minY, point.getY());
-            maxX = Math.max(maxX, point.getX());
-            maxY = Math.max(maxY, point.getY());
-        }
-        if (maxX <= minX || maxY <= minY) return new Rect(0, 0, width, height);
-        return new Rect((int) minX, (int) minY, (int) maxX, (int) maxY);
-    }
-
-    private static Bitmap crop(Bitmap bitmap, Rect rect, boolean square) {
-        if (bitmap == null || rect == null) return null;
-        Rect expanded = expand(rect, bitmap.getWidth(), bitmap.getHeight(), square);
-        int width = expanded.width();
-        int height = expanded.height();
-        if (width <= 16 || height <= 16) return null;
-        try {
-            return Bitmap.createBitmap(bitmap, expanded.left, expanded.top, width, height);
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
-
-    private static Rect expand(Rect rect, int maxWidth, int maxHeight, boolean square) {
-        int width = Math.max(rect.width(), 1);
-        int height = Math.max(rect.height(), 1);
-        int size = square ? Math.max(width, height) : width;
-        int margin = Math.max(8, size / 8);
-        int centerX = rect.left + width / 2;
-        int centerY = rect.top + height / 2;
-        int halfWidth = square ? size / 2 + margin : width / 2 + margin;
-        int halfHeight = square ? size / 2 + margin : height / 2 + margin;
-        return new Rect(
-                Math.max(0, centerX - halfWidth),
-                Math.max(0, centerY - halfHeight),
-                Math.min(maxWidth, centerX + halfWidth),
-                Math.min(maxHeight, centerY + halfHeight)
-        );
     }
 
     private static String dataUrl(Bitmap bitmap) {
@@ -394,7 +242,7 @@ public class BridgeQr {
         if (view instanceof Button) return "button";
         if (clickableTarget(view) != null && !TextUtils.isEmpty(text)) return "button";
         if (view.isClickable()) return "button";
-        if (view instanceof ImageView && looksLikeQrImage(view)) return "image";
+        if (view instanceof ImageView && looksLikeBridgeImage(view)) return "image";
         if (view instanceof TextView && !TextUtils.isEmpty(text)) return "text";
         return "";
     }
@@ -417,7 +265,7 @@ public class BridgeQr {
         return value == null ? "" : value.toString().trim();
     }
 
-    private static boolean looksLikeQrImage(View view) {
+    private static boolean looksLikeBridgeImage(View view) {
         int width = view.getWidth();
         int height = view.getHeight();
         float ratio = height == 0 ? 0 : (float) width / (float) height;
@@ -461,7 +309,7 @@ public class BridgeQr {
             return root;
         }
         if (dialogOnly) return null;
-        if (usableRoot(activityRoot) && (!dialogOnly || hasQrImage(activityRoot))) return new Root(activityRoot, params(activityRoot));
+        if (usableRoot(activityRoot) && (!dialogOnly || hasBridgeImage(activityRoot))) return new Root(activityRoot, params(activityRoot));
         return null;
     }
 
@@ -499,7 +347,7 @@ public class BridgeQr {
             if (containsIgnoreCase(title, "dialog") || containsIgnoreCase(title, "popup") || containsIgnoreCase(title, "panel")) return true;
         }
         if (isLargeRoot(root.view) && !hasLoginCue(root.view)) return false;
-        return hasLoginCue(root.view) || hasEditText(root.view) || (hasQrImage(root.view) && !looksLikeMainActivity(root.view));
+        return hasLoginCue(root.view) || hasEditText(root.view) || (hasBridgeImage(root.view) && !looksLikeMainActivity(root.view));
     }
 
     private static boolean looksLikeMainActivity(View view) {
@@ -529,8 +377,7 @@ public class BridgeQr {
                 || containsIgnoreCase(text, "夸克")
                 || containsIgnoreCase(text, "百度")
                 || containsIgnoreCase(text, "阿里")
-                || containsIgnoreCase(text, "login")
-                || containsIgnoreCase(text, "qr");
+                || containsIgnoreCase(text, "login");
     }
 
     private static boolean hasEditText(View view) {
@@ -557,7 +404,7 @@ public class BridgeQr {
     }
 
     private static boolean isSmallTextOnlyRoot(View view) {
-        if (!usableRoot(view) || hasInteractiveContent(view) || hasQrImage(view)) return false;
+        if (!usableRoot(view) || hasInteractiveContent(view) || hasBridgeImage(view)) return false;
         DisplayMetrics metrics = App.get().getResources().getDisplayMetrics();
         int screenArea = Math.max(metrics.widthPixels * metrics.heightPixels, 1);
         int area = view.getWidth() * view.getHeight();
@@ -577,12 +424,12 @@ public class BridgeQr {
         return false;
     }
 
-    private static boolean hasQrImage(View view) {
+    private static boolean hasBridgeImage(View view) {
         if (view == null || !view.isShown()) return false;
-        if (view instanceof ImageView && looksLikeQrImage(view)) return true;
+        if (view instanceof ImageView && looksLikeBridgeImage(view)) return true;
         if (view instanceof ViewGroup) {
             ViewGroup group = (ViewGroup) view;
-            for (int index = 0; index < group.getChildCount(); index++) if (hasQrImage(group.getChildAt(index))) return true;
+            for (int index = 0; index < group.getChildCount(); index++) if (hasBridgeImage(group.getChildAt(index))) return true;
         }
         return false;
     }

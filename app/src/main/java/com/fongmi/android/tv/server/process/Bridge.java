@@ -12,7 +12,7 @@ import com.fongmi.android.tv.bean.Site;
 import com.fongmi.android.tv.player.Source;
 import com.fongmi.android.tv.server.Nano;
 import com.fongmi.android.tv.server.Server;
-import com.fongmi.android.tv.server.bridge.BridgeQr;
+import com.fongmi.android.tv.server.bridge.BridgeJarUi;
 import com.fongmi.android.tv.server.bridge.BridgeSites;
 import com.fongmi.android.tv.server.bridge.BridgeTokens;
 import com.fongmi.android.tv.server.impl.Process;
@@ -61,10 +61,9 @@ public class Bridge implements Process {
     private static final String LOCAL_PROXY_PREFIX = "/bridge/local/";
     private static final String MEDIA_PROXY_PREFIX = "/bridge/media/";
     private static final ConcurrentHashMap<String, MediaTarget> MEDIA_TARGETS = new ConcurrentHashMap<>();
-    private FutureTask<Result> qrTask;
-    private Thread qrThread;
-    private String qrProvider = "";
-    private String qrAction = "";
+    private FutureTask<Result> uiTask;
+    private Thread uiThread;
+    private String uiAction = "";
 
     @Override
     public boolean isRequest(IHTTPSession session, String url) {
@@ -140,8 +139,6 @@ public class Bridge implements Process {
                 result = category(site, body);
                 return result(result);
             case "detail":
-                JsonObject detailAction = detailAction(site, body);
-                if (detailAction != null) return detailAction;
                 result = detail(site, body);
                 return result(result);
             case "search":
@@ -153,14 +150,14 @@ public class Bridge implements Process {
                 return action(site, body);
             case "token":
                 return BridgeTokens.save(site, body);
-            case "qrLogin":
-                return qrLogin(site, body);
-            case "qrStatus":
-                return qrStatus(body);
-            case "qrAction":
-                return qrAction(body);
-            case "qrConfirm":
-                return qrConfirm(body);
+            case "uiOpen":
+                return uiOpen(site, body);
+            case "uiStatus":
+                return uiStatus(body);
+            case "uiAction":
+                return uiAction(body);
+            case "uiClose":
+                return uiClose();
             default:
                 return error("not_found", "Unsupported site action: " + action);
         }
@@ -208,11 +205,11 @@ public class Bridge implements Process {
             result = playerContentWithTimeout(site, flag, id);
         } catch (TimeoutException e) {
             BridgeTokens.invalidate(site, body);
-            return playResult(session, site, body, Result.error("当前网盘播放需要先完成 Bridge 授权或重新扫码登录"));
+            return playResult(session, site, body, Result.error("当前网盘播放需要先完成 Android Jar 授权"));
         } catch (Exception e) {
             if (BridgeTokens.shouldPromptOnError(site, body, e)) {
                 BridgeTokens.invalidate(site, body);
-                return playResult(session, site, body, Result.error("当前网盘播放需要先完成 Bridge 授权或重新扫码登录"));
+                return playResult(session, site, body, Result.error("当前网盘播放需要先完成 Android Jar 授权"));
             }
             throw e;
         }
@@ -256,192 +253,33 @@ public class Bridge implements Process {
 
     private JsonObject action(Site site, JsonObject body) throws Exception {
         String action = string(body, "action");
-        JsonObject bridgeAction = cloudAction(site, action, body);
-        if (bridgeAction != null) return bridgeAction;
-        if (isConfigCenterSite(site)) return unsupportedConfigAction(action);
-        if (inVodConfig(site)) return result(SiteApi.action(site.getKey(), action));
-        String json = site.recent().spider().action(action);
-        return result(Result.fromJson(json));
+        String id = first(body, "id", "vodId");
+        if (TextUtils.isEmpty(action) && TextUtils.isEmpty(id)) return error("bad_request", "Bridge action 需要 action 或 id");
+        FutureTask<Result> task = new FutureTask<>(() -> TextUtils.isEmpty(action) ? detail(site, body) : actionContent(site, action));
+        return beginUiTask(site, task, "bridge-ui-action-" + site.getKey(), action);
     }
 
-    private JsonObject cloudAction(Site site, String action, JsonObject body) {
-        String rawAction = action == null ? "" : action.trim();
-        String normalized = normalizeCloudAction(rawAction);
-        switch (normalized) {
-            case "LoginShow":
-            case "pushCkShow":
-                return cloudLogin(site, normalized, BridgeTokens.loginPrompts(site));
-            case "quarkLogin":
-                return cloudLogin(site, rawAction, BridgeTokens.promptForProvider(site, "quark", "扫码登录后，Cookie 会保存到 Android Bridge 运行时", rawAction));
-            case "ucLogin":
-                return cloudLogin(site, rawAction, BridgeTokens.promptForProvider(site, "uc", "扫码登录后，Cookie 会保存到 Android Bridge 运行时", rawAction));
-            case "aliLogin":
-                return cloudLogin(site, rawAction, BridgeTokens.promptForProvider(site, "ali", "登录或粘贴 Token 后，会保存到 Android Bridge 运行时", rawAction));
-            case "baiduLogin":
-                return cloudLogin(site, rawAction, BridgeTokens.promptForProvider(site, "baidu", "登录或粘贴 Cookie 后，会保存到 Android Bridge 运行时", rawAction));
-            case "115Login":
-                return cloudLogin(site, rawAction, BridgeTokens.promptForProvider(site, "115", "粘贴 115 Cookie 后，会保存到 Android Bridge 运行时", rawAction));
-            case "123panLogin":
-                return cloudLogin(site, rawAction, BridgeTokens.promptForProvider(site, "123pan", "粘贴 123 网盘 Token 或 Cookie 后，会保存到 Android Bridge 运行时", rawAction));
-            case "quarkClean":
-                return BridgeTokens.clear("quark");
-            case "ucClean":
-                return BridgeTokens.clear("uc");
-            case "aliClean":
-                return BridgeTokens.clear("ali");
-            case "BdClean":
-                return BridgeTokens.clear("baidu");
-            case "115Clean":
-                return BridgeTokens.clear("115");
-            case "123panClean":
-                return BridgeTokens.clear("123pan");
-            default:
-                return genericCloudConfigAction(site, rawAction, body);
-        }
-    }
-
-    private JsonObject genericCloudConfigAction(Site site, String action, JsonObject body) {
-        if (!isCloudActionSite(site)) return null;
-        String context = cloudActionContext(site, action, body);
-        if (!looksLikeCloudConfigAction(context)) return null;
-        String provider = providerFromContext(context);
-        if (looksLikeClearAction(context)) return BridgeTokens.clear(provider);
-        return cloudLogin(site, action, BridgeTokens.promptForProvider(site, provider, "请在 Android Jar 弹窗中完成网盘登录，状态保存到 Android Bridge 运行时", action));
-    }
-
-    private JsonObject cloudLogin(Site site, String action, JsonObject prompt) {
-        JsonArray prompts = new JsonArray();
-        prompts.add(prompt);
-        return cloudLogin(site, action, prompts);
-    }
-
-    private JsonObject cloudLogin(Site site, String action, JsonArray prompts) {
-        JsonObject login = ok();
-        login.addProperty("mode", "cloudLogin");
-        login.addProperty("action", action);
-        login.addProperty("message", "选择网盘登录方式，登录状态只保存到 Android Bridge");
-        login.add("prompts", prompts);
-        return login;
-    }
-
-    private String normalizeCloudAction(String action) {
-        String value = action == null ? "" : action.trim();
-        String lower = value.toLowerCase(Locale.ROOT);
-        switch (lower) {
-            case "0000":
-                return "LoginShow";
-            case "6666":
-                return "pushCkShow";
-            case "3333":
-                return "ucClean";
-            case "2222":
-                return "quarkClean";
-            case "bddd":
-                return "BdClean";
-            case "1111":
-                return "aliClean";
-            case "baidupanlogin":
-            case "bdlogin":
-                return "baiduLogin";
-            case "baidupanclear":
-            case "bdclean":
-                return "BdClean";
-            case "quarkcookie":
-            case "quarklogin":
-                return "quarkLogin";
-            case "quarkclearcookie":
-                return "quarkClean";
-            case "ucpancookie":
-            case "uctvpancookie":
-            case "uclogin":
-                return "ucLogin";
-            case "ucpanallclearcookie":
-                return "ucClean";
-            case "aliyuntoken":
-            case "alilogin":
-                return "aliLogin";
-            case "aliyuncleartoken":
-                return "aliClean";
-            case "115pancookie":
-                return "115Login";
-            case "115panclearcookie":
-                return "115Clean";
-            case "pan123login":
-            case "123panlogin":
-                return "123panLogin";
-            default:
-                return value;
-        }
-    }
-
-    private String cloudActionContext(Site site, String action, JsonObject body) {
-        return (site.getKey() + " " + site.getName() + " " + site.getApi() + " " + action + " "
-                + string(body, "name") + " " + string(body, "title") + " " + string(body, "note") + " "
-                + string(body, "text") + " " + string(body, "remark") + " " + string(body, "remarks")).toLowerCase(Locale.ROOT);
-    }
-
-    private boolean looksLikeCloudConfigAction(String text) {
-        if (TextUtils.isEmpty(text)) return false;
-        return text.contains("login")
-                || text.contains("cookie")
-                || text.contains("token")
-                || text.contains("扫码")
-                || text.contains("登录")
-                || text.contains("授权")
-                || text.contains("清除")
-                || text.contains("退出")
-                || text.contains("重置")
-                || text.contains("clear")
-                || text.contains("clean")
-                || text.contains("网盘")
-                || text.contains("云盘")
-                || text.contains("夸克")
-                || text.contains("百度")
-                || text.contains("阿里")
-                || text.contains("uc")
-                || text.contains("115")
-                || text.contains("123pan")
-                || text.contains("123盘");
-    }
-
-    private boolean looksLikeClearAction(String text) {
-        if (TextUtils.isEmpty(text)) return false;
-        return text.contains("clear") || text.contains("clean") || text.contains("清除") || text.contains("退出") || text.contains("重置");
-    }
-
-    private String providerFromContext(String text) {
-        if (TextUtils.isEmpty(text)) return "cloud";
-        if (text.contains("uc网盘") || text.contains("uc 网盘") || text.contains("ucpan") || text.contains("uc_") || text.contains("drive.uc.cn")) return "uc";
-        if (text.contains("quark") || text.contains("夸克") || text.contains("夸父")) return "quark";
-        if (text.contains("ali") || text.contains("阿里") || text.contains("alipan") || text.contains("aliyundrive")) return "ali";
-        if (text.contains("百度") || text.contains("baidu") || text.contains("bd")) return "baidu";
-        if (text.contains("115")) return "115";
-        if (text.contains("123pan") || text.contains("123盘")) return "123pan";
-        return "cloud";
-    }
-
-    private JsonObject unsupportedConfigAction(String action) {
-        JsonObject object = ok();
-        object.addProperty("mode", "message");
-        object.addProperty("action", action);
-        object.addProperty("message", "这个配置项暂不能在 macOS 客户端直接设置，请先用已支持的网盘 Cookie/Token 配置项，或在 Android 端配置中心处理。");
-        return object;
-    }
-
-    private JsonObject qrLogin(Site site, JsonObject body) {
-        String provider = provider(body);
+    private JsonObject uiOpen(Site site, JsonObject body) {
         String flag = string(body, "flag");
         String id = first(body, "id", "url");
         String action = string(body, "action");
-        boolean hadQrTask = qrTask != null;
-        cancelQrTask();
-        if (hadQrTask) BridgeQr.dismiss();
-        FutureTask<Result> task = new FutureTask<>(() -> TextUtils.isEmpty(action) ? playerContent(site, flag, id) : actionContent(site, action));
-        Thread thread = new Thread(task, "bridge-qr-" + site.getKey());
-        qrTask = task;
-        qrThread = thread;
-        qrProvider = provider;
-        qrAction = action;
+        FutureTask<Result> task = new FutureTask<>(() -> {
+            if (!TextUtils.isEmpty(action)) return actionContent(site, action);
+            if (!TextUtils.isEmpty(flag) || !TextUtils.isEmpty(id)) return playerContent(site, flag, id);
+            return detail(site, body);
+        });
+        return beginUiTask(site, task, "bridge-ui-open-" + site.getKey(), action);
+    }
+
+    private JsonObject beginUiTask(Site site, FutureTask<Result> task, String threadName, String action) {
+        boolean hadTask = uiTask != null;
+        cancelUiTask();
+        if (hadTask) BridgeJarUi.dismiss();
+        Thread thread = new Thread(task, threadName);
+        uiTask = task;
+        uiThread = thread;
+        uiAction = action == null ? "" : action;
+        BridgeJarUi.bringHostToFront();
         thread.start();
         Thread cleaner = new Thread(() -> {
             try {
@@ -450,114 +288,113 @@ public class Bridge implements Process {
                 task.cancel(true);
                 thread.interrupt();
             }
-        }, "bridge-qr-cleaner-" + site.getKey());
+        }, "bridge-ui-cleaner-" + site.getKey());
         cleaner.start();
-        JsonObject result = BridgeQr.captureJarUi(provider);
-        if (!bool(result, "ok", false) && !TextUtils.isEmpty(action) && !"LoginShow".equals(action)) {
-            cancelQrTask();
-            JsonObject fallbackBody = body.deepCopy();
-            fallbackBody.addProperty("action", "LoginShow");
-            JsonObject fallback = qrLogin(site, fallbackBody);
-            fallback.addProperty("fallbackAction", "LoginShow");
-            return fallback;
-        }
-        result.addProperty("provider", provider);
-        if (!bool(result, "ok", false)) {
-            cancelQrTask();
-        }
-        return result;
+        JsonObject object = waitForUiOrTask(task);
+        object.addProperty("action", uiAction);
+        if (!"androidJarUi".equals(string(object, "mode")) || "completed".equals(string(object, "status"))) clearFinishedUiTask(task);
+        return object;
     }
 
-    private JsonObject qrStatus(JsonObject body) {
+    private JsonObject waitForUiOrTask(FutureTask<Result> task) {
+        long deadline = System.currentTimeMillis() + 15000;
+        while (System.currentTimeMillis() < deadline) {
+            JsonObject snapshot = BridgeJarUi.snapshot();
+            if (bool(snapshot, "ok", false)) return snapshot;
+            if (task.isDone()) return uiTaskResult(task);
+            try {
+                TimeUnit.MILLISECONDS.sleep(250);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return error("interrupted", "等待 Android Jar 界面时被中断");
+            }
+        }
+        if (task.isDone()) return uiTaskResult(task);
+        cancelUiTask();
+        return error("jar_ui_missing", "Android Jar 没有返回结果，也没有出现可桥接窗口");
+    }
+
+    private JsonObject uiTaskResult(FutureTask<Result> task) {
         JsonObject object = ok();
-        object.addProperty("mode", "androidQr");
-        String provider = activeQrProvider(body);
-        object.addProperty("provider", provider);
-        boolean includeUi = bool(body, "includeUi", false);
-        FutureTask<Result> task = qrTask;
-        JsonObject mismatch = qrProviderMismatch(body);
-        if (mismatch != null) return mismatch;
-        if (task == null) return qrStatus(object, "idle", false, "Android Jar 二维码登录未开始");
-        if (task.isCancelled()) return maybeCopyUi(qrStatus(object, "cancelled", false, "Android Jar 二维码登录已取消或超时"), includeUi);
-        if (!TextUtils.isEmpty(qrAction) && BridgeQr.hasJarUi()) return maybeCopyUi(qrStatus(object, "waiting", false, "等待 Android Jar 弹窗操作完成..."), includeUi);
-        if (!task.isDone()) return maybeCopyUi(qrStatus(object, "waiting", false, "等待 Android Jar 弹窗操作完成..."), includeUi);
+        object.addProperty("mode", "androidJarUi");
+        object.addProperty("status", "completed");
+        object.addProperty("done", true);
+        object.addProperty("message", "Android Jar 操作已完成");
         try {
             Result result = task.get();
-            String url = result == null ? "" : UrlUtil.convert(result.getUrl().v());
-            if (!TextUtils.isEmpty(url) || !TextUtils.isEmpty(qrAction)) {
-                BridgeTokens.markQrReady(provider);
-                return qrStatus(object, "completed", true, "Android 端已完成扫码登录，正在重试播放...");
-            }
-            String message = result == null ? "" : result.getMsg();
-            if (TextUtils.isEmpty(message)) message = "Android Jar 二维码登录未返回播放地址";
-            object.addProperty("code", "qr_login_failed");
-            return qrStatus(object, "failed", false, message);
+            if (result == null) return object;
+            JsonObject resultObject = result(result);
+            resultObject.addProperty("status", "completed");
+            resultObject.addProperty("done", true);
+            if (!resultObject.has("mode")) resultObject.addProperty("mode", "message");
+            return resultObject;
         } catch (CancellationException e) {
-            return qrStatus(object, "cancelled", false, "Android Jar 二维码登录已取消或超时");
+            return uiStatus(object, "cancelled", false, "Android Jar 操作已取消或超时");
         } catch (ExecutionException e) {
-            object.addProperty("code", "qr_login_failed");
-            return qrStatus(object, "failed", false, safeMessage(e.getCause() == null ? e : e.getCause()));
+            object.addProperty("code", "jar_ui_failed");
+            return uiStatus(object, "failed", false, safeMessage(e.getCause() == null ? e : e.getCause()));
         } catch (Throwable e) {
-            object.addProperty("code", "qr_login_failed");
-            return qrStatus(object, "failed", false, safeMessage(e));
+            object.addProperty("code", "jar_ui_failed");
+            return uiStatus(object, "failed", false, safeMessage(e));
         }
     }
 
-    private JsonObject qrStatus(JsonObject object, String status, boolean done, String message) {
+    private JsonObject uiStatus(JsonObject body) {
+        JsonObject object = ok();
+        object.addProperty("mode", "androidJarUi");
+        boolean includeUi = bool(body, "includeUi", false);
+        FutureTask<Result> task = uiTask;
+        if (task == null) return uiStatus(object, "idle", false, "Android Jar 界面桥接未开始");
+        if (task.isCancelled()) return maybeCopyUi(uiStatus(object, "cancelled", false, "Android Jar 操作已取消或超时"), includeUi);
+        if (BridgeJarUi.hasJarUi()) return maybeCopyUi(uiStatus(object, "waiting", false, "等待 Android Jar 界面操作完成..."), includeUi);
+        if (!task.isDone()) return maybeCopyUi(uiStatus(object, "waiting", false, "等待 Android Jar 操作完成..."), includeUi);
+        JsonObject result = uiTaskResult(task);
+        clearFinishedUiTask(task);
+        return maybeCopyUi(result, includeUi);
+    }
+
+    private JsonObject uiStatus(JsonObject object, String status, boolean done, String message) {
         object.addProperty("status", status);
         object.addProperty("done", done);
         object.addProperty("message", message);
         return object;
     }
 
-    private JsonObject qrAction(JsonObject body) {
-        JsonObject mismatch = qrProviderMismatch(body);
-        if (mismatch != null) return mismatch;
-        String provider = activeQrProvider(body);
+    private JsonObject uiAction(JsonObject body) {
         String action = string(body, "action");
         JsonObject object;
         switch (action) {
             case "click":
-                object = BridgeQr.click(string(body, "elementId"), number(body, "x", -1), number(body, "y", -1));
+                object = BridgeJarUi.click(string(body, "elementId"), number(body, "x", -1), number(body, "y", -1));
                 break;
             case "input":
-                object = BridgeQr.input(string(body, "elementId"), string(body, "text"));
+                object = BridgeJarUi.input(string(body, "elementId"), string(body, "text"));
                 break;
             case "submit":
-                object = BridgeQr.submit(string(body, "elementId"));
+                object = BridgeJarUi.submit(string(body, "elementId"));
                 break;
             case "back":
-                object = BridgeQr.back();
+                object = BridgeJarUi.back();
                 break;
             case "refresh":
-                object = BridgeQr.snapshot();
+                object = BridgeJarUi.snapshot();
                 break;
             case "cancel":
-                object = ok();
-                object.addProperty("mode", "androidJarUi");
-                object.addProperty("dismissed", BridgeQr.dismiss());
-                object.addProperty("message", "已取消 Android Jar 弹窗登录");
-                cancelQrTask();
+                object = uiClose();
                 break;
             default:
-                object = error("bad_qr_action", "Unsupported QR UI action: " + action);
+                object = error("bad_ui_action", "Unsupported Android Jar UI action: " + action);
                 break;
         }
-        object.addProperty("provider", provider);
         return object;
     }
 
-    private JsonObject qrConfirm(JsonObject body) {
-        String provider = activeQrProvider(body);
-        JsonObject mismatch = qrProviderMismatch(body);
-        if (mismatch != null) return mismatch;
-        if (qrTask == null) return objectError(ok(), "qr_not_started", "Android Jar 弹窗登录未开始");
+    private JsonObject uiClose() {
         JsonObject object = ok();
-        object.addProperty("provider", provider);
-        object.addProperty("dismissed", BridgeQr.dismiss());
-        BridgeTokens.markQrReady(provider);
-        cancelQrTask();
-        object.addProperty("message", "已确认 Android Jar 二维码登录，准备重试播放");
+        object.addProperty("mode", "androidJarUi");
+        object.addProperty("dismissed", BridgeJarUi.dismiss());
+        object.addProperty("message", "已关闭 Android Jar 界面桥接");
+        cancelUiTask();
         return object;
     }
 
@@ -572,75 +409,22 @@ public class Bridge implements Process {
     }
 
     private JsonObject maybeCopyUi(JsonObject object, boolean includeUi) {
-        return includeUi ? copyUi(object, BridgeQr.snapshot()) : object;
+        return includeUi ? copyUi(object, BridgeJarUi.snapshot()) : object;
     }
 
-    private JsonObject qrProviderMismatch(JsonObject body) {
-        String requested = provider(body);
-        if (TextUtils.isEmpty(qrProvider) || requested.equals(qrProvider)) return null;
-        JsonObject object = error("qr_provider_mismatch", "当前二维码任务属于 " + qrProvider + "，不能用 " + requested + " 确认或轮询");
-        object.addProperty("provider", qrProvider);
-        object.addProperty("requestedProvider", requested);
-        object.addProperty("mode", "androidQr");
-        return object;
+    private void cancelUiTask() {
+        if (uiTask != null) uiTask.cancel(true);
+        if (uiThread != null) uiThread.interrupt();
+        uiTask = null;
+        uiThread = null;
+        uiAction = "";
     }
 
-    private String activeQrProvider(JsonObject body) {
-        if (!TextUtils.isEmpty(qrProvider)) return qrProvider;
-        return provider(body);
-    }
-
-    private String provider(JsonObject body) {
-        String provider = string(body, "provider").toLowerCase(Locale.ROOT);
-        return TextUtils.isEmpty(provider) ? "quark" : provider;
-    }
-
-    private void cancelQrTask() {
-        if (qrTask != null) qrTask.cancel(true);
-        if (qrThread != null) qrThread.interrupt();
-        qrTask = null;
-        qrThread = null;
-        qrProvider = "";
-        qrAction = "";
-    }
-
-    private JsonObject detailAction(Site site, JsonObject body) {
-        String action = actionFromDetailId(first(body, "id", "vodId"));
-        if (action.isEmpty() && isConfigCenterSite(site)) {
-            action = first(body, "id", "vodId");
-            JsonObject bridgeAction = cloudAction(site, action, body);
-            return bridgeAction == null ? unsupportedConfigAction(action) : bridgeAction;
-        }
-        if (!isCloudActionSite(site) || action.isEmpty()) return null;
-        JsonObject bridgeAction = cloudAction(site, action, body);
-        if (bridgeAction != null) return bridgeAction;
-        JsonObject object = error("action_required", "当前云盘配置项需要新版客户端通过 Bridge action 执行");
-        object.addProperty("action", action);
-        return object;
-    }
-
-    private boolean isCloudActionSite(Site site) {
-        String text = (site.getKey() + " " + site.getName() + " " + site.getApi()).toLowerCase();
-        return text.contains("mdrive") || text.contains("mydrive") || text.contains("我的云盘") || text.contains("云盘") || text.contains("网盘") || text.contains("pan") || text.contains("drive") || isConfigCenterSite(site);
-    }
-
-    private boolean isConfigCenterSite(Site site) {
-        String text = (site.getKey() + " " + site.getName() + " " + site.getApi()).toLowerCase(Locale.ROOT);
-        String name = site.getName() == null ? "" : site.getName();
-        return text.contains("wexconfig") || text.contains("wexokconfig") || (name.contains("配置") && name.contains("中心"));
-    }
-
-    private String actionFromDetailId(String id) {
-        switch (id) {
-            case "0000": return "LoginShow";
-            case "6666": return "pushCkShow";
-            case "3333": return "ucClean";
-            case "2222": return "quarkClean";
-            case "bddd": return "BdClean";
-            case "1111": return "aliClean";
-            case "4444": return "panSortShow";
-            case "5555": return "panSourceSortShow";
-            default: return "";
+    private void clearFinishedUiTask(FutureTask<Result> task) {
+        if (task != null && task == uiTask && task.isDone()) {
+            uiTask = null;
+            uiThread = null;
+            uiAction = "";
         }
     }
 

@@ -66,8 +66,8 @@ public class BridgeTokens {
 
     public static JsonArray loginPrompts(Site site) {
         JsonArray prompts = new JsonArray();
-        prompts.add(promptForProvider(site, "quark", "扫码登录后，Cookie 会保存到 Android Bridge 运行时", "LoginShow"));
-        prompts.add(promptForProvider(site, "uc", "扫码登录后，Cookie 会保存到 Android Bridge 运行时", "LoginShow"));
+        prompts.add(promptForProvider(site, "quark", "请在 Android Jar 界面完成授权，Cookie 会保存到 Android Bridge 运行时", "LoginShow"));
+        prompts.add(promptForProvider(site, "uc", "请在 Android Jar 界面完成授权，Cookie 会保存到 Android Bridge 运行时", "LoginShow"));
         prompts.add(promptForProvider(site, "ali", "登录或粘贴 Token 后，会保存到 Android Bridge 运行时", "LoginShow"));
         prompts.add(promptForProvider(site, "baidu", "登录或粘贴 Cookie 后，会保存到 Android Bridge 运行时", "LoginShow"));
         prompts.add(promptForProvider(site, "115", "粘贴 115 Cookie 后，会保存到 Android Bridge 运行时", "LoginShow"));
@@ -140,7 +140,7 @@ public class BridgeTokens {
         JsonObject values = object(body, "values");
         if (TextUtils.isEmpty(token) && values.entrySet().isEmpty()) return error("empty_token", "Token 不能为空");
         if (isKnownProvider(provider) && !hasUsableSubmittedCredential(provider, token, values)) {
-            return error("invalid_token", label(provider) + " Cookie 无效或未完成登录，请重新扫码后再提取");
+            return error("invalid_token", label(provider) + " Cookie 无效或未完成登录，请重新完成授权后再提取");
         }
         if (isKnownProvider(provider)) cleanupGenericCloudCredentials();
 
@@ -197,15 +197,15 @@ public class BridgeTokens {
         BaseLoader.get().clearSync();
     }
 
-    public static void markQrReady(String provider) {
+    public static void markJarUiReady(String provider) {
         if (TextUtils.isEmpty(provider)) return;
-        write(markerKey(provider), "qr");
+        write(markerKey(provider), "android_jar_ui");
         BaseLoader.get().clearSync();
     }
 
     private static boolean hasBridgeCredential(String provider) {
         String marker = bridgeMarker(provider);
-        if ("qr".equals(marker)) return true;
+        if ("android_jar_ui".equals(marker)) return true;
         return hasSavedCredential(provider) || "1".equals(marker);
     }
 
@@ -365,7 +365,7 @@ public class BridgeTokens {
 
     private static JsonObject login(Site site, String provider) {
         JsonObject object = new JsonObject();
-        object.addProperty("type", "androidJarQr");
+        object.addProperty("type", "androidJarUi");
         object.addProperty("title", label(provider) + " Android Jar 登录");
         object.addProperty("url", loginUrl(provider));
         object.addProperty("cookieKey", "token");
