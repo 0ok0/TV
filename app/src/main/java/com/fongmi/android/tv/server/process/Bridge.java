@@ -1,5 +1,6 @@
 package com.fongmi.android.tv.server.process;
 
+import android.app.Activity;
 import android.text.TextUtils;
 import android.util.Base64;
 
@@ -16,7 +17,9 @@ import com.fongmi.android.tv.server.bridge.BridgeJarUi;
 import com.fongmi.android.tv.server.bridge.BridgeSites;
 import com.fongmi.android.tv.server.bridge.BridgeTokens;
 import com.fongmi.android.tv.server.impl.Process;
+import com.fongmi.android.tv.ui.activity.VideoActivity;
 import com.fongmi.android.tv.utils.AbiUtil;
+import com.fongmi.android.tv.utils.Task;
 import com.fongmi.android.tv.utils.UrlUtil;
 import com.github.catvod.Proxy;
 import com.github.catvod.crawler.Spider;
@@ -43,11 +46,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.UUID;
 
 import fi.iki.elonen.NanoHTTPD;
@@ -60,9 +66,11 @@ public class Bridge implements Process {
     private static final String MIME_JSON = "application/json; charset=utf-8";
     private static final String LOCAL_PROXY_PREFIX = "/bridge/local/";
     private static final String MEDIA_PROXY_PREFIX = "/bridge/media/";
+    private static final long UI_WAIT_TIMEOUT = 20000;
+    private static final long UI_TASK_DONE_GRACE = 12000;
     private static final ConcurrentHashMap<String, MediaTarget> MEDIA_TARGETS = new ConcurrentHashMap<>();
     private FutureTask<Result> uiTask;
-    private Thread uiThread;
+    private Future<?> uiFuture;
     private String uiAction = "";
 
     @Override
@@ -129,6 +137,7 @@ public class Bridge implements Process {
         String action = parts[5];
         Site site = site(key);
         if (site.isEmpty()) return error("site_not_found", "Bridge site not found: " + key);
+        activateSite(site);
 
         Result result;
         switch (action) {
@@ -255,8 +264,36 @@ public class Bridge implements Process {
         String action = string(body, "action");
         String id = first(body, "id", "vodId");
         if (TextUtils.isEmpty(action) && TextUtils.isEmpty(id)) return error("bad_request", "Bridge action 需要 action 或 id");
-        FutureTask<Result> task = new FutureTask<>(() -> TextUtils.isEmpty(action) ? detail(site, body) : actionContent(site, action));
-        return beginUiTask(site, task, "bridge-ui-action-" + site.getKey(), action);
+        boolean detailUi = !TextUtils.isEmpty(id) && (TextUtils.isEmpty(action) || TextUtils.equals(action, id));
+        FutureTask<Result> task = new FutureTask<>(() -> detailUi ? openDetailUi(site, body) : actionContent(site, action));
+        return beginUiTask(site, task, "bridge-ui-action-" + site.getKey(), detailUi ? id : action);
+    }
+
+    private Result openDetailUi(Site site, JsonObject body) throws Exception {
+        String id = first(body, "id", "vodId");
+        String name = first(body, "name", "vodName", "title");
+        String pic = first(body, "pic", "vodPic", "cover");
+        String mark = first(body, "mark", "typeName");
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        App.post(() -> {
+            try {
+                Activity activity = App.activity();
+                if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+                    failure.set(new IllegalStateException("Android app is not in foreground"));
+                    return;
+                }
+                VideoActivity.start(activity, site.getKey(), id, name, pic, TextUtils.isEmpty(mark) ? null : mark);
+            } catch (Throwable e) {
+                failure.set(e);
+            } finally {
+                latch.countDown();
+            }
+        });
+        if (!latch.await(3, TimeUnit.SECONDS)) throw new TimeoutException("打开 Android 原生详情页超时");
+        if (failure.get() instanceof Exception) throw (Exception) failure.get();
+        if (failure.get() != null) throw new RuntimeException(failure.get());
+        return Result.error("已打开 Android 原生详情页，等待 Jar 弹窗");
     }
 
     private JsonObject uiOpen(Site site, JsonObject body) {
@@ -275,18 +312,16 @@ public class Bridge implements Process {
         boolean hadTask = uiTask != null;
         cancelUiTask();
         if (hadTask) BridgeJarUi.dismiss();
-        Thread thread = new Thread(task, threadName);
         uiTask = task;
-        uiThread = thread;
         uiAction = action == null ? "" : action;
         BridgeJarUi.bringHostToFront();
-        thread.start();
+        uiFuture = Task.executor().submit(task);
         Thread cleaner = new Thread(() -> {
             try {
                 task.get(120, TimeUnit.SECONDS);
             } catch (Throwable ignored) {
                 task.cancel(true);
-                thread.interrupt();
+                if (uiFuture != null) uiFuture.cancel(true);
             }
         }, "bridge-ui-cleaner-" + site.getKey());
         cleaner.start();
@@ -297,11 +332,19 @@ public class Bridge implements Process {
     }
 
     private JsonObject waitForUiOrTask(FutureTask<Result> task) {
-        long deadline = System.currentTimeMillis() + 15000;
+        long deadline = System.currentTimeMillis() + UI_WAIT_TIMEOUT;
+        long doneAt = 0;
+        JsonObject taskResult = null;
         while (System.currentTimeMillis() < deadline) {
             JsonObject snapshot = BridgeJarUi.snapshot();
             if (bool(snapshot, "ok", false)) return snapshot;
-            if (task.isDone()) return uiTaskResult(task);
+            if (task.isDone()) {
+                if (doneAt == 0) {
+                    doneAt = System.currentTimeMillis();
+                    taskResult = uiTaskResult(task);
+                }
+                if (System.currentTimeMillis() - doneAt >= UI_TASK_DONE_GRACE) return taskResult;
+            }
             try {
                 TimeUnit.MILLISECONDS.sleep(250);
             } catch (InterruptedException e) {
@@ -309,7 +352,7 @@ public class Bridge implements Process {
                 return error("interrupted", "等待 Android Jar 界面时被中断");
             }
         }
-        if (task.isDone()) return uiTaskResult(task);
+        if (task.isDone()) return taskResult != null ? taskResult : uiTaskResult(task);
         cancelUiTask();
         return error("jar_ui_missing", "Android Jar 没有返回结果，也没有出现可桥接窗口");
     }
@@ -414,16 +457,16 @@ public class Bridge implements Process {
 
     private void cancelUiTask() {
         if (uiTask != null) uiTask.cancel(true);
-        if (uiThread != null) uiThread.interrupt();
+        if (uiFuture != null) uiFuture.cancel(true);
         uiTask = null;
-        uiThread = null;
+        uiFuture = null;
         uiAction = "";
     }
 
     private void clearFinishedUiTask(FutureTask<Result> task) {
         if (task != null && task == uiTask && task.isDone()) {
             uiTask = null;
-            uiThread = null;
+            uiFuture = null;
             uiAction = "";
         }
     }
@@ -467,6 +510,13 @@ public class Bridge implements Process {
         Site site = BridgeSites.getRegisteredSite(key);
         if (!site.isEmpty()) return site;
         return VodConfig.get().getSite(key);
+    }
+
+    private void activateSite(Site site) {
+        Site current = VodConfig.get().getSite(site.getKey());
+        if (current.isEmpty()) return;
+        if (current.getKey().equals(VodConfig.get().getHome().getKey())) return;
+        VodConfig.get().setHome(current);
     }
 
     private synchronized void ensureVodConfigLoaded(String configUrl) {

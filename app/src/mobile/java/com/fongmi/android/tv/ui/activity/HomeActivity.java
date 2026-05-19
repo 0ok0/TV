@@ -78,7 +78,6 @@ public class HomeActivity extends BaseActivity implements NavigationBarView.OnIt
     protected void initView(Bundle savedInstanceState) {
         orientation = getResources().getConfiguration().orientation;
         mBinding.navigation.setOnItemSelectedListener(this);
-        PermissionUtil.requestNotify(this);
         HeadlessServerService.start(this);
         initFragment(savedInstanceState);
         Updater.create().start(this);

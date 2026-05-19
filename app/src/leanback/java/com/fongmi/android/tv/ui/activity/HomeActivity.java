@@ -120,7 +120,6 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         mResult = Result.empty();
         mClock = Clock.create(mBinding.clock);
         mBinding.progressLayout.showProgress();
-        PermissionUtil.requestNotify(this);
         DLNARendererService.start(this);
         HeadlessServerService.start(this);
         Updater.create().start(this);
