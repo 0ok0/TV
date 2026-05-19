@@ -54,18 +54,24 @@ public class BridgeTokens {
     }
 
     public static JsonObject promptForProvider(Site site, String provider, String message) {
+        return promptForProvider(site, provider, message, "");
+    }
+
+    public static JsonObject promptForProvider(Site site, String provider, String message, String action) {
         if (TextUtils.isEmpty(message)) message = label(provider) + " 需要先配置 Token 或 Cookie";
-        return prompt(site, new JsonObject(), provider, message);
+        JsonObject request = new JsonObject();
+        if (!TextUtils.isEmpty(action)) request.addProperty("action", action);
+        return prompt(site, request, provider, message);
     }
 
     public static JsonArray loginPrompts(Site site) {
         JsonArray prompts = new JsonArray();
-        prompts.add(promptForProvider(site, "quark", "扫码登录后，Cookie 会保存到 Android Bridge 运行时"));
-        prompts.add(promptForProvider(site, "uc", "扫码登录后，Cookie 会保存到 Android Bridge 运行时"));
-        prompts.add(promptForProvider(site, "ali", "登录或粘贴 Token 后，会保存到 Android Bridge 运行时"));
-        prompts.add(promptForProvider(site, "baidu", "登录或粘贴 Cookie 后，会保存到 Android Bridge 运行时"));
-        prompts.add(promptForProvider(site, "115", "粘贴 115 Cookie 后，会保存到 Android Bridge 运行时"));
-        prompts.add(promptForProvider(site, "123pan", "粘贴 123 网盘 Token 或 Cookie 后，会保存到 Android Bridge 运行时"));
+        prompts.add(promptForProvider(site, "quark", "扫码登录后，Cookie 会保存到 Android Bridge 运行时", "LoginShow"));
+        prompts.add(promptForProvider(site, "uc", "扫码登录后，Cookie 会保存到 Android Bridge 运行时", "LoginShow"));
+        prompts.add(promptForProvider(site, "ali", "登录或粘贴 Token 后，会保存到 Android Bridge 运行时", "LoginShow"));
+        prompts.add(promptForProvider(site, "baidu", "登录或粘贴 Cookie 后，会保存到 Android Bridge 运行时", "LoginShow"));
+        prompts.add(promptForProvider(site, "115", "粘贴 115 Cookie 后，会保存到 Android Bridge 运行时", "LoginShow"));
+        prompts.add(promptForProvider(site, "123pan", "粘贴 123 网盘 Token 或 Cookie 后，会保存到 Android Bridge 运行时", "LoginShow"));
         return prompts;
     }
 
@@ -75,6 +81,8 @@ public class BridgeTokens {
         object.addProperty("title", label(provider) + " Token");
         object.addProperty("message", message);
         object.addProperty("submitPath", "/api/v1/site/" + site.getKey() + "/token");
+        String action = first(request, "action", "act");
+        if (!TextUtils.isEmpty(action)) object.addProperty("action", action);
         JsonObject login = login(site, provider);
         if (login != null) object.add("login", login);
         JsonArray fields = new JsonArray();
@@ -89,6 +97,7 @@ public class BridgeTokens {
         JsonObject retry = new JsonObject();
         retry.addProperty("flag", string(request, "flag"));
         retry.addProperty("id", first(request, "id", "url"));
+        retry.addProperty("action", action);
         object.add("retry", retry);
         return object;
     }
@@ -355,12 +364,10 @@ public class BridgeTokens {
     }
 
     private static JsonObject login(Site site, String provider) {
-        String url = loginUrl(provider);
-        if (TextUtils.isEmpty(url)) return null;
         JsonObject object = new JsonObject();
-        object.addProperty("type", "webCookie");
-        object.addProperty("title", label(provider) + " 登录");
-        object.addProperty("url", url);
+        object.addProperty("type", "androidJarQr");
+        object.addProperty("title", label(provider) + " Android Jar 登录");
+        object.addProperty("url", loginUrl(provider));
         object.addProperty("cookieKey", "token");
         JsonArray domains = new JsonArray();
         for (String domain : loginDomains(provider)) domains.add(domain);

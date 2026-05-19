@@ -64,6 +64,7 @@ public class Bridge implements Process {
     private FutureTask<Result> qrTask;
     private Thread qrThread;
     private String qrProvider = "";
+    private String qrAction = "";
 
     @Override
     public boolean isRequest(IHTTPSession session, String url) {
@@ -247,9 +248,15 @@ public class Bridge implements Process {
         return result;
     }
 
+    private Result actionContent(Site site, String action) throws Exception {
+        if (inVodConfig(site)) return SiteApi.action(site.getKey(), action);
+        String json = site.recent().spider().action(action);
+        return Result.fromJson(json);
+    }
+
     private JsonObject action(Site site, JsonObject body) throws Exception {
         String action = string(body, "action");
-        JsonObject bridgeAction = cloudAction(site, action);
+        JsonObject bridgeAction = cloudAction(site, action, body);
         if (bridgeAction != null) return bridgeAction;
         if (isConfigCenterSite(site)) return unsupportedConfigAction(action);
         if (inVodConfig(site)) return result(SiteApi.action(site.getKey(), action));
@@ -257,24 +264,25 @@ public class Bridge implements Process {
         return result(Result.fromJson(json));
     }
 
-    private JsonObject cloudAction(Site site, String action) {
-        action = normalizeCloudAction(action);
-        switch (action) {
+    private JsonObject cloudAction(Site site, String action, JsonObject body) {
+        String rawAction = action == null ? "" : action.trim();
+        String normalized = normalizeCloudAction(rawAction);
+        switch (normalized) {
             case "LoginShow":
             case "pushCkShow":
-                return cloudLogin(site, action, BridgeTokens.loginPrompts(site));
+                return cloudLogin(site, normalized, BridgeTokens.loginPrompts(site));
             case "quarkLogin":
-                return cloudLogin(site, action, BridgeTokens.promptForProvider(site, "quark", "扫码登录后，Cookie 会保存到 Android Bridge 运行时"));
+                return cloudLogin(site, rawAction, BridgeTokens.promptForProvider(site, "quark", "扫码登录后，Cookie 会保存到 Android Bridge 运行时", rawAction));
             case "ucLogin":
-                return cloudLogin(site, action, BridgeTokens.promptForProvider(site, "uc", "扫码登录后，Cookie 会保存到 Android Bridge 运行时"));
+                return cloudLogin(site, rawAction, BridgeTokens.promptForProvider(site, "uc", "扫码登录后，Cookie 会保存到 Android Bridge 运行时", rawAction));
             case "aliLogin":
-                return cloudLogin(site, action, BridgeTokens.promptForProvider(site, "ali", "登录或粘贴 Token 后，会保存到 Android Bridge 运行时"));
+                return cloudLogin(site, rawAction, BridgeTokens.promptForProvider(site, "ali", "登录或粘贴 Token 后，会保存到 Android Bridge 运行时", rawAction));
             case "baiduLogin":
-                return cloudLogin(site, action, BridgeTokens.promptForProvider(site, "baidu", "登录或粘贴 Cookie 后，会保存到 Android Bridge 运行时"));
+                return cloudLogin(site, rawAction, BridgeTokens.promptForProvider(site, "baidu", "登录或粘贴 Cookie 后，会保存到 Android Bridge 运行时", rawAction));
             case "115Login":
-                return cloudLogin(site, action, BridgeTokens.promptForProvider(site, "115", "粘贴 115 Cookie 后，会保存到 Android Bridge 运行时"));
+                return cloudLogin(site, rawAction, BridgeTokens.promptForProvider(site, "115", "粘贴 115 Cookie 后，会保存到 Android Bridge 运行时", rawAction));
             case "123panLogin":
-                return cloudLogin(site, action, BridgeTokens.promptForProvider(site, "123pan", "粘贴 123 网盘 Token 或 Cookie 后，会保存到 Android Bridge 运行时"));
+                return cloudLogin(site, rawAction, BridgeTokens.promptForProvider(site, "123pan", "粘贴 123 网盘 Token 或 Cookie 后，会保存到 Android Bridge 运行时", rawAction));
             case "quarkClean":
                 return BridgeTokens.clear("quark");
             case "ucClean":
@@ -288,8 +296,17 @@ public class Bridge implements Process {
             case "123panClean":
                 return BridgeTokens.clear("123pan");
             default:
-                return null;
+                return genericCloudConfigAction(site, rawAction, body);
         }
+    }
+
+    private JsonObject genericCloudConfigAction(Site site, String action, JsonObject body) {
+        if (!isCloudActionSite(site)) return null;
+        String context = cloudActionContext(site, action, body);
+        if (!looksLikeCloudConfigAction(context)) return null;
+        String provider = providerFromContext(context);
+        if (looksLikeClearAction(context)) return BridgeTokens.clear(provider);
+        return cloudLogin(site, action, BridgeTokens.promptForProvider(site, provider, "请在 Android Jar 弹窗中完成网盘登录，状态保存到 Android Bridge 运行时", action));
     }
 
     private JsonObject cloudLogin(Site site, String action, JsonObject prompt) {
@@ -311,6 +328,18 @@ public class Bridge implements Process {
         String value = action == null ? "" : action.trim();
         String lower = value.toLowerCase(Locale.ROOT);
         switch (lower) {
+            case "0000":
+                return "LoginShow";
+            case "6666":
+                return "pushCkShow";
+            case "3333":
+                return "ucClean";
+            case "2222":
+                return "quarkClean";
+            case "bddd":
+                return "BdClean";
+            case "1111":
+                return "aliClean";
             case "baidupanlogin":
             case "bdlogin":
                 return "baiduLogin";
@@ -345,6 +374,52 @@ public class Bridge implements Process {
         }
     }
 
+    private String cloudActionContext(Site site, String action, JsonObject body) {
+        return (site.getKey() + " " + site.getName() + " " + site.getApi() + " " + action + " "
+                + string(body, "name") + " " + string(body, "title") + " " + string(body, "note") + " "
+                + string(body, "text") + " " + string(body, "remark") + " " + string(body, "remarks")).toLowerCase(Locale.ROOT);
+    }
+
+    private boolean looksLikeCloudConfigAction(String text) {
+        if (TextUtils.isEmpty(text)) return false;
+        return text.contains("login")
+                || text.contains("cookie")
+                || text.contains("token")
+                || text.contains("扫码")
+                || text.contains("登录")
+                || text.contains("授权")
+                || text.contains("清除")
+                || text.contains("退出")
+                || text.contains("重置")
+                || text.contains("clear")
+                || text.contains("clean")
+                || text.contains("网盘")
+                || text.contains("云盘")
+                || text.contains("夸克")
+                || text.contains("百度")
+                || text.contains("阿里")
+                || text.contains("uc")
+                || text.contains("115")
+                || text.contains("123pan")
+                || text.contains("123盘");
+    }
+
+    private boolean looksLikeClearAction(String text) {
+        if (TextUtils.isEmpty(text)) return false;
+        return text.contains("clear") || text.contains("clean") || text.contains("清除") || text.contains("退出") || text.contains("重置");
+    }
+
+    private String providerFromContext(String text) {
+        if (TextUtils.isEmpty(text)) return "cloud";
+        if (text.contains("uc网盘") || text.contains("uc 网盘") || text.contains("ucpan") || text.contains("uc_") || text.contains("drive.uc.cn")) return "uc";
+        if (text.contains("quark") || text.contains("夸克") || text.contains("夸父")) return "quark";
+        if (text.contains("ali") || text.contains("阿里") || text.contains("alipan") || text.contains("aliyundrive")) return "ali";
+        if (text.contains("百度") || text.contains("baidu") || text.contains("bd")) return "baidu";
+        if (text.contains("115")) return "115";
+        if (text.contains("123pan") || text.contains("123盘")) return "123pan";
+        return "cloud";
+    }
+
     private JsonObject unsupportedConfigAction(String action) {
         JsonObject object = ok();
         object.addProperty("mode", "message");
@@ -357,14 +432,16 @@ public class Bridge implements Process {
         String provider = provider(body);
         String flag = string(body, "flag");
         String id = first(body, "id", "url");
+        String action = string(body, "action");
         boolean hadQrTask = qrTask != null;
         cancelQrTask();
         if (hadQrTask) BridgeQr.dismiss();
-        FutureTask<Result> task = new FutureTask<>(() -> playerContent(site, flag, id));
+        FutureTask<Result> task = new FutureTask<>(() -> TextUtils.isEmpty(action) ? playerContent(site, flag, id) : actionContent(site, action));
         Thread thread = new Thread(task, "bridge-qr-" + site.getKey());
         qrTask = task;
         qrThread = thread;
         qrProvider = provider;
+        qrAction = action;
         thread.start();
         Thread cleaner = new Thread(() -> {
             try {
@@ -375,7 +452,15 @@ public class Bridge implements Process {
             }
         }, "bridge-qr-cleaner-" + site.getKey());
         cleaner.start();
-        JsonObject result = BridgeQr.captureJarUi();
+        JsonObject result = BridgeQr.captureJarUi(provider);
+        if (!bool(result, "ok", false) && !TextUtils.isEmpty(action) && !"LoginShow".equals(action)) {
+            cancelQrTask();
+            JsonObject fallbackBody = body.deepCopy();
+            fallbackBody.addProperty("action", "LoginShow");
+            JsonObject fallback = qrLogin(site, fallbackBody);
+            fallback.addProperty("fallbackAction", "LoginShow");
+            return fallback;
+        }
         result.addProperty("provider", provider);
         if (!bool(result, "ok", false)) {
             cancelQrTask();
@@ -394,11 +479,12 @@ public class Bridge implements Process {
         if (mismatch != null) return mismatch;
         if (task == null) return qrStatus(object, "idle", false, "Android Jar 二维码登录未开始");
         if (task.isCancelled()) return maybeCopyUi(qrStatus(object, "cancelled", false, "Android Jar 二维码登录已取消或超时"), includeUi);
+        if (!TextUtils.isEmpty(qrAction) && BridgeQr.hasJarUi()) return maybeCopyUi(qrStatus(object, "waiting", false, "等待 Android Jar 弹窗操作完成..."), includeUi);
         if (!task.isDone()) return maybeCopyUi(qrStatus(object, "waiting", false, "等待 Android Jar 弹窗操作完成..."), includeUi);
         try {
             Result result = task.get();
             String url = result == null ? "" : UrlUtil.convert(result.getUrl().v());
-            if (!TextUtils.isEmpty(url)) {
+            if (!TextUtils.isEmpty(url) || !TextUtils.isEmpty(qrAction)) {
                 BridgeTokens.markQrReady(provider);
                 return qrStatus(object, "completed", true, "Android 端已完成扫码登录，正在重试播放...");
             }
@@ -515,17 +601,18 @@ public class Bridge implements Process {
         qrTask = null;
         qrThread = null;
         qrProvider = "";
+        qrAction = "";
     }
 
     private JsonObject detailAction(Site site, JsonObject body) {
         String action = actionFromDetailId(first(body, "id", "vodId"));
         if (action.isEmpty() && isConfigCenterSite(site)) {
             action = first(body, "id", "vodId");
-            JsonObject bridgeAction = cloudAction(site, action);
+            JsonObject bridgeAction = cloudAction(site, action, body);
             return bridgeAction == null ? unsupportedConfigAction(action) : bridgeAction;
         }
         if (!isCloudActionSite(site) || action.isEmpty()) return null;
-        JsonObject bridgeAction = cloudAction(site, action);
+        JsonObject bridgeAction = cloudAction(site, action, body);
         if (bridgeAction != null) return bridgeAction;
         JsonObject object = error("action_required", "当前云盘配置项需要新版客户端通过 Bridge action 执行");
         object.addProperty("action", action);
@@ -534,7 +621,7 @@ public class Bridge implements Process {
 
     private boolean isCloudActionSite(Site site) {
         String text = (site.getKey() + " " + site.getName() + " " + site.getApi()).toLowerCase();
-        return text.contains("mdrive") || text.contains("mydrive") || text.contains("我的云盘") || text.contains("云盘") || isConfigCenterSite(site);
+        return text.contains("mdrive") || text.contains("mydrive") || text.contains("我的云盘") || text.contains("云盘") || text.contains("网盘") || text.contains("pan") || text.contains("drive") || isConfigCenterSite(site);
     }
 
     private boolean isConfigCenterSite(Site site) {
