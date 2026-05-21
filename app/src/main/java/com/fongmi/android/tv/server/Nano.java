@@ -72,7 +72,11 @@ public class Nano extends NanoHTTPD {
     private void parse(IHTTPSession session, Map<String, String> files) {
         try {
             String ct = session.getHeaders().get("content-type");
-            if (ct != null) session.getHeaders().put("content-type", ct.replace("multipart/form-data", "multipart/form-data; charset=utf-8"));
+            if (ct != null && !ct.toLowerCase().contains("charset=")) {
+                if (ct.contains("multipart/form-data")) ct = ct.replace("multipart/form-data", "multipart/form-data; charset=utf-8");
+                else if (ct.contains("application/json")) ct += "; charset=utf-8";
+                session.getHeaders().put("content-type", ct);
+            }
             session.parseBody(files);
         } catch (Exception ignored) {
         }

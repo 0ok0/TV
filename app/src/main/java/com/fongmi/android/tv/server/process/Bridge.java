@@ -1,6 +1,11 @@
 package com.fongmi.android.tv.server.process;
 
 import android.app.Activity;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Environment;
+import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Base64;
 
@@ -10,6 +15,8 @@ import com.fongmi.android.tv.api.config.VodConfig;
 import com.fongmi.android.tv.bean.Config;
 import com.fongmi.android.tv.bean.Result;
 import com.fongmi.android.tv.bean.Site;
+import com.fongmi.android.tv.impl.ParseCallback;
+import com.fongmi.android.tv.player.ParseJob;
 import com.fongmi.android.tv.player.Source;
 import com.fongmi.android.tv.server.Nano;
 import com.fongmi.android.tv.server.Server;
@@ -28,6 +35,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import java.io.File;
 import java.io.ByteArrayInputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
@@ -71,6 +79,8 @@ public class Bridge implements Process {
     private static final ConcurrentHashMap<String, MediaTarget> MEDIA_TARGETS = new ConcurrentHashMap<>();
     private FutureTask<Result> uiTask;
     private Future<?> uiFuture;
+    private Site uiSite;
+    private JsonObject uiBody = new JsonObject();
     private String uiAction = "";
 
     @Override
@@ -111,10 +121,11 @@ public class Bridge implements Process {
     }
 
     private JsonObject register(JsonObject body) {
+        ensureSharedStorageReady();
         String configUrl = normalizeUrlForAndroid(string(body, "configUrl"));
         if (!TextUtils.isEmpty(configUrl)) body.addProperty("configUrl", configUrl);
-        ensureVodConfigLoaded(configUrl);
         String configId = BridgeSites.register(body);
+        if (!hasRegisteredSites(body)) ensureVodConfigLoaded(configUrl);
         JsonObject object = ok();
         object.addProperty("configId", configId);
         object.add("sites", BridgeSites.toJson(allSites()));
@@ -130,12 +141,15 @@ public class Bridge implements Process {
     }
 
     private JsonObject site(IHTTPSession session, String url, JsonObject body) throws Exception {
-        ensureVodConfigLoaded(BridgeSites.getConfigUrl());
         String[] parts = url.split("/");
         if (parts.length < 6) return error("bad_request", "Expected /api/v1/site/{siteKey}/{action}");
         String key = decode(parts[4]);
         String action = parts[5];
-        Site site = site(key);
+        Site site = BridgeSites.getRegisteredSite(key);
+        if (site.isEmpty()) {
+            ensureVodConfigLoaded(BridgeSites.getConfigUrl());
+            site = site(key);
+        }
         if (site.isEmpty()) return error("site_not_found", "Bridge site not found: " + key);
         activateSite(site);
 
@@ -204,17 +218,14 @@ public class Bridge implements Process {
     }
 
     private JsonObject play(IHTTPSession session, Site site, JsonObject body) throws Exception {
+        ensureSharedStorageReady();
         String flag = string(body, "flag");
         String id = first(body, "id", "url");
-        if (BridgeTokens.shouldPromptBeforePlay(site, body)) {
-            return playResult(session, site, body, Result.error("当前网盘播放需要先配置 Token 或 Cookie"));
-        }
         Result result;
         try {
             result = playerContentWithTimeout(site, flag, id);
         } catch (TimeoutException e) {
-            BridgeTokens.invalidate(site, body);
-            return playResult(session, site, body, Result.error("当前网盘播放需要先完成 Android Jar 授权"));
+            return error("play_timeout", "Android Bridge 获取播放地址超时，请稍后重试");
         } catch (Exception e) {
             if (BridgeTokens.shouldPromptOnError(site, body, e)) {
                 BridgeTokens.invalidate(site, body);
@@ -230,7 +241,7 @@ public class Bridge implements Process {
         Thread thread = new Thread(task, "bridge-play-" + site.getKey());
         thread.start();
         try {
-            return task.get(12, TimeUnit.SECONDS);
+            return task.get(site.getTimeout(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
             task.cancel(true);
             thread.interrupt();
@@ -261,12 +272,13 @@ public class Bridge implements Process {
     }
 
     private JsonObject action(Site site, JsonObject body) throws Exception {
+        ensureSharedStorageReady();
         String action = string(body, "action");
         String id = first(body, "id", "vodId");
         if (TextUtils.isEmpty(action) && TextUtils.isEmpty(id)) return error("bad_request", "Bridge action 需要 action 或 id");
         boolean detailUi = !TextUtils.isEmpty(id) && (TextUtils.isEmpty(action) || TextUtils.equals(action, id));
         FutureTask<Result> task = new FutureTask<>(() -> detailUi ? openDetailUi(site, body) : actionContent(site, action));
-        return beginUiTask(site, task, "bridge-ui-action-" + site.getKey(), detailUi ? id : action);
+        return beginUiTask(site, body, task, "bridge-ui-action-" + site.getKey(), detailUi ? id : action);
     }
 
     private Result openDetailUi(Site site, JsonObject body) throws Exception {
@@ -297,6 +309,8 @@ public class Bridge implements Process {
     }
 
     private JsonObject uiOpen(Site site, JsonObject body) {
+        JsonObject storageError = sharedStorageError();
+        if (storageError != null) return storageError;
         String flag = string(body, "flag");
         String id = first(body, "id", "url");
         String action = string(body, "action");
@@ -305,14 +319,16 @@ public class Bridge implements Process {
             if (!TextUtils.isEmpty(flag) || !TextUtils.isEmpty(id)) return playerContent(site, flag, id);
             return detail(site, body);
         });
-        return beginUiTask(site, task, "bridge-ui-open-" + site.getKey(), action);
+        return beginUiTask(site, body, task, "bridge-ui-open-" + site.getKey(), action);
     }
 
-    private JsonObject beginUiTask(Site site, FutureTask<Result> task, String threadName, String action) {
+    private JsonObject beginUiTask(Site site, JsonObject body, FutureTask<Result> task, String threadName, String action) {
         boolean hadTask = uiTask != null;
         cancelUiTask();
         if (hadTask) BridgeJarUi.dismiss();
         uiTask = task;
+        uiSite = site;
+        uiBody = body == null ? new JsonObject() : body.deepCopy();
         uiAction = action == null ? "" : action;
         BridgeJarUi.bringHostToFront();
         uiFuture = Task.executor().submit(task);
@@ -325,13 +341,13 @@ public class Bridge implements Process {
             }
         }, "bridge-ui-cleaner-" + site.getKey());
         cleaner.start();
-        JsonObject object = waitForUiOrTask(task);
+        JsonObject object = waitForUiOrTask(site, uiBody, task);
         object.addProperty("action", uiAction);
         if (!"androidJarUi".equals(string(object, "mode")) || "completed".equals(string(object, "status"))) clearFinishedUiTask(task);
         return object;
     }
 
-    private JsonObject waitForUiOrTask(FutureTask<Result> task) {
+    private JsonObject waitForUiOrTask(Site site, JsonObject body, FutureTask<Result> task) {
         long deadline = System.currentTimeMillis() + UI_WAIT_TIMEOUT;
         long doneAt = 0;
         JsonObject taskResult = null;
@@ -341,7 +357,7 @@ public class Bridge implements Process {
             if (task.isDone()) {
                 if (doneAt == 0) {
                     doneAt = System.currentTimeMillis();
-                    taskResult = uiTaskResult(task);
+                    taskResult = uiTaskResult(site, body, task);
                 }
                 if (System.currentTimeMillis() - doneAt >= UI_TASK_DONE_GRACE) return taskResult;
             }
@@ -352,12 +368,12 @@ public class Bridge implements Process {
                 return error("interrupted", "等待 Android Jar 界面时被中断");
             }
         }
-        if (task.isDone()) return taskResult != null ? taskResult : uiTaskResult(task);
+        if (task.isDone()) return taskResult != null ? taskResult : uiTaskResult(site, body, task);
         cancelUiTask();
         return error("jar_ui_missing", "Android Jar 没有返回结果，也没有出现可桥接窗口");
     }
 
-    private JsonObject uiTaskResult(FutureTask<Result> task) {
+    private JsonObject uiTaskResult(Site site, JsonObject body, FutureTask<Result> task) {
         JsonObject object = ok();
         object.addProperty("mode", "androidJarUi");
         object.addProperty("status", "completed");
@@ -366,6 +382,14 @@ public class Bridge implements Process {
         try {
             Result result = task.get();
             if (result == null) return object;
+            String convertedUrl = UrlUtil.convert(result.getUrl().v());
+            boolean hasCredential = BridgeTokens.markReadyIfCredentialPresent(site, body, result);
+            if (BridgeTokens.shouldPrompt(site, body, result, convertedUrl) && !hasCredential) {
+                object.addProperty("code", "token_required");
+                object.add("prompt", BridgeTokens.prompt(site, body, result));
+                return uiStatus(object, "failed", false, result.getMsg().isEmpty() ? "Android Jar 登录未完成" : result.getMsg());
+            }
+            BridgeTokens.markReadyIfAuthenticated(site, body, result);
             JsonObject resultObject = result(result);
             resultObject.addProperty("status", "completed");
             resultObject.addProperty("done", true);
@@ -391,7 +415,7 @@ public class Bridge implements Process {
         if (task.isCancelled()) return maybeCopyUi(uiStatus(object, "cancelled", false, "Android Jar 操作已取消或超时"), includeUi);
         if (BridgeJarUi.hasJarUi()) return maybeCopyUi(uiStatus(object, "waiting", false, "等待 Android Jar 界面操作完成..."), includeUi);
         if (!task.isDone()) return maybeCopyUi(uiStatus(object, "waiting", false, "等待 Android Jar 操作完成..."), includeUi);
-        JsonObject result = uiTaskResult(task);
+        JsonObject result = uiTaskResult(uiSite, uiBody, task);
         clearFinishedUiTask(task);
         return maybeCopyUi(result, includeUi);
     }
@@ -437,6 +461,7 @@ public class Bridge implements Process {
         object.addProperty("mode", "androidJarUi");
         object.addProperty("dismissed", BridgeJarUi.dismiss());
         object.addProperty("message", "已关闭 Android Jar 界面桥接");
+        BridgeTokens.markReadyIfCredentialPresent(uiSite, uiBody, null);
         cancelUiTask();
         return object;
     }
@@ -460,6 +485,8 @@ public class Bridge implements Process {
         if (uiFuture != null) uiFuture.cancel(true);
         uiTask = null;
         uiFuture = null;
+        uiSite = null;
+        uiBody = new JsonObject();
         uiAction = "";
     }
 
@@ -467,37 +494,96 @@ public class Bridge implements Process {
         if (task != null && task == uiTask && task.isDone()) {
             uiTask = null;
             uiFuture = null;
+            uiSite = null;
+            uiBody = new JsonObject();
             uiAction = "";
         }
     }
 
     private JsonObject playResult(IHTTPSession session, Site site, JsonObject body, Result result) {
         String convertedUrl = UrlUtil.convert(result.getUrl().v());
-        Map<String, String> headers = result.getHeader();
-        boolean hasHeaders = !headers.isEmpty();
-        boolean bridgeProxy = isBridgeProxy(convertedUrl);
-        String url = hasHeaders ? mediaProxyUrl(session, convertedUrl, headers) : externalize(session, convertedUrl);
+        Map<String, String> headers = new HashMap<>(result.getHeader());
         boolean needsParse = result.needParse() || result.shouldUseParse();
-        boolean needsHeaders = false;
+        String jxFrom = result.getJxFrom();
         JsonObject object = ok();
+        if (BridgeTokens.shouldPrompt(site, body, result, convertedUrl)) {
+            object.addProperty("mode", "tokenRequired");
+            object.add("prompt", BridgeTokens.prompt(site, body, result));
+            return objectError(object, "token_required", result.getMsg().isEmpty() ? "当前网盘播放需要先配置 Token 或 Cookie" : result.getMsg());
+        }
+        if (needsParse) {
+            ParseResolution resolution = resolveByAndroidParse(result);
+            if (resolution == null || TextUtils.isEmpty(resolution.url)) return objectError(object, "parse_required", "Android 解析器未能产出可播放地址");
+            convertedUrl = UrlUtil.convert(resolution.url);
+            if (!resolution.headers.isEmpty()) headers = resolution.headers;
+            jxFrom = resolution.from;
+            needsParse = false;
+        }
+        boolean hasHeaders = !headers.isEmpty();
+        boolean needsHeaders = false;
+        String url = hasHeaders ? mediaProxyUrl(session, convertedUrl, headers) : externalize(session, convertedUrl);
         object.addProperty("mode", needsParse || needsHeaders ? "proxyRequired" : "direct");
         object.addProperty("url", url);
         object.add("headers", App.gson().toJsonTree(headers));
         object.addProperty("format", result.getFormat());
         object.addProperty("parse", result.getParse());
         object.addProperty("flag", result.getFlag());
+        object.addProperty("jxFrom", jxFrom);
         object.addProperty("expiresAt", 0);
         object.add("subtitles", App.gson().toJsonTree(result.getSubs()));
         object.add("danmakus", App.gson().toJsonTree(result.getDanmaku()));
-        if (BridgeTokens.shouldPrompt(site, body, result, url)) {
-            object.addProperty("mode", "tokenRequired");
-            object.add("prompt", BridgeTokens.prompt(site, body, result));
-            return objectError(object, "token_required", result.getMsg().isEmpty() ? "当前网盘播放需要先配置 Token 或 Cookie" : result.getMsg());
-        }
-        if (needsParse) return objectError(object, "parse_required", "当前播放结果仍需要 Android Web/解析器处理，Bridge 自有解析代理尚未启用");
         if (needsHeaders) return objectError(object, "headers_required", "当前播放结果需要请求头，iOS 第一版播放器尚未接入 headers，请启用 Bridge 媒体代理后播放");
         if (url.isEmpty()) return objectError(object, "empty_url", "播放地址为空");
+        BridgeTokens.markReadyIfAuthenticated(site, body, result);
         return object;
+    }
+
+    private ParseResolution resolveByAndroidParse(Result result) {
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<ParseResolution> parsed = new AtomicReference<>();
+        AtomicReference<ParseJob> jobRef = new AtomicReference<>();
+        ParseCallback callback = new ParseCallback() {
+            @Override
+            public void onParseSuccess(Map<String, String> headers, String url, String from) {
+                parsed.set(new ParseResolution(url, headers, from));
+                latch.countDown();
+            }
+
+            @Override
+            public void onParseError() {
+                latch.countDown();
+            }
+        };
+        try {
+            ParseJob job = ParseJob.create(callback).start(result, result.shouldUseParse());
+            jobRef.set(job);
+            if (!latch.await(35, TimeUnit.SECONDS)) {
+                job.stop();
+                return null;
+            }
+            return parsed.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            ParseJob job = jobRef.get();
+            if (job != null) job.stop();
+            return null;
+        } catch (Throwable e) {
+            ParseJob job = jobRef.get();
+            if (job != null) job.stop();
+            return null;
+        }
+    }
+
+    private static class ParseResolution {
+        private final String url;
+        private final Map<String, String> headers;
+        private final String from;
+
+        private ParseResolution(String url, Map<String, String> headers, String from) {
+            this.url = url;
+            this.headers = headers == null ? new HashMap<>() : new HashMap<>(headers);
+            this.from = TextUtils.isEmpty(from) ? "" : from;
+        }
     }
 
     private JsonObject result(Result result) {
@@ -526,6 +612,49 @@ public class Bridge implements Process {
         VodConfig.get().clear().config(Config.find(configUrl, 0)).ensureLoaded();
     }
 
+    private void ensureSharedStorageReady() {
+        try {
+            new File("/storage/emulated/0/FM").mkdirs();
+            new File("/sdcard/FM").mkdirs();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private JsonObject sharedStorageError() {
+        ensureSharedStorageReady();
+        if (!canWriteLegacyStorage()) {
+            openStoragePermissionSettings();
+            return error("storage_permission_required", "Android 端需要允许 TVBox 管理所有文件，否则网盘 Jar 无法保存登录态。已尝试打开 Android 授权页，请授权后再重试。");
+        }
+        return null;
+    }
+
+    private boolean canWriteLegacyStorage() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) return false;
+        File probe = new File("/storage/emulated/0/FM", ".bridge_write_probe");
+        try {
+            if (probe.exists() && !probe.delete()) return false;
+            if (!probe.createNewFile()) return false;
+            return probe.delete() || !probe.exists();
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private void openStoragePermissionSettings() {
+        App.post(() -> {
+            Activity activity = App.activity();
+            if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
+            Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + App.get().getPackageName()));
+            if (intent.resolveActivity(App.get().getPackageManager()) == null) intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try {
+                activity.startActivity(intent);
+            } catch (Throwable ignored) {
+            }
+        });
+    }
+
     private String normalizeUrlForAndroid(String value) {
         if (TextUtils.isEmpty(value)) return "";
         try {
@@ -545,6 +674,10 @@ public class Bridge implements Process {
         List<Site> sites = BridgeSites.getRegisteredSites();
         for (Site site : VodConfig.get().getSites()) if (!sites.contains(site)) sites.add(site);
         return sites;
+    }
+
+    private boolean hasRegisteredSites(JsonObject body) {
+        return body != null && body.has("sites") && body.get("sites").isJsonArray() && body.getAsJsonArray("sites").size() > 0;
     }
 
     private boolean inVodConfig(Site site) {

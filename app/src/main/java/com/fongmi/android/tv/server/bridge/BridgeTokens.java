@@ -11,11 +11,13 @@ import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.api.loader.BaseLoader;
 import com.fongmi.android.tv.bean.Result;
 import com.fongmi.android.tv.bean.Site;
+import com.github.catvod.utils.Path;
 import com.github.catvod.utils.Prefers;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -37,7 +39,7 @@ public class BridgeTokens {
 
     public static boolean shouldPromptOnError(Site site, JsonObject request, Throwable throwable) {
         String message = throwable == null ? "" : throwable.getMessage();
-        return looksLikeCloud(site, request, message);
+        return isTokenText(message) && looksLikeCloud(site, request, message);
     }
 
     public static boolean shouldPrompt(Site site, JsonObject request, Result result, String url) {
@@ -115,6 +117,9 @@ public class BridgeTokens {
         for (String key : cookieCredentialKeys(provider)) {
             remove(key);
             removedKeys.add(key);
+        }
+        for (File file : legacyCredentialFiles(provider)) {
+            if (file.exists() && file.delete()) removedKeys.add(file.getAbsolutePath());
         }
         remove(markerKey(provider));
         removedKeys.add(markerKey(provider));
@@ -203,6 +208,26 @@ public class BridgeTokens {
         BaseLoader.get().clearSync();
     }
 
+    public static boolean markReadyIfCredentialPresent(Site site, JsonObject request, Result result) {
+        if (site == null) return false;
+        String text = result == null ? "" : result.getMsg() + " " + result.getUrl().v();
+        String provider = provider(site, request, text);
+        if (!isKnownProvider(provider) || !hasSavedCredential(provider)) return false;
+        markJarUiReady(provider);
+        Log.i(TAG, "marked jar ui ready provider=" + provider);
+        return true;
+    }
+
+    public static void markReadyIfAuthenticated(Site site, JsonObject request, Result result) {
+        if (site == null) return;
+        String text = result == null ? "" : result.getMsg() + " " + result.getUrl().v();
+        String provider = provider(site, request, text);
+        if (!isKnownProvider(provider)) return;
+        if (result != null && TextUtils.isEmpty(result.getUrl().v()) && !hasSavedCredential(provider)) return;
+        markJarUiReady(provider);
+        Log.i(TAG, "marked jar ui ready provider=" + provider);
+    }
+
     private static boolean hasBridgeCredential(String provider) {
         String marker = bridgeMarker(provider);
         if ("android_jar_ui".equals(marker)) return true;
@@ -232,6 +257,12 @@ public class BridgeTokens {
                 }
             }
         }
+        String webCookie = readWebCookies(provider);
+        if (isUsableCredential(provider, webCookie)) {
+            expandCredential(provider, webCookie);
+            return true;
+        }
+        if (hasLegacyCredentialFile(provider)) return true;
         return false;
     }
 
@@ -427,6 +458,23 @@ public class BridgeTokens {
         }
     }
 
+    private static String readWebCookies(String provider) {
+        try {
+            CookieManager manager = CookieManager.getInstance();
+            StringBuilder builder = new StringBuilder();
+            for (String url : cookieUrls(provider)) {
+                String cookie = manager.getCookie(url);
+                if (TextUtils.isEmpty(cookie)) continue;
+                if (builder.length() > 0) builder.append("; ");
+                builder.append(cookie);
+            }
+            return builder.toString();
+        } catch (Throwable e) {
+            Log.w(TAG, "read web cookies failed: " + e.getClass().getSimpleName());
+            return "";
+        }
+    }
+
     private static void clearWebCookies(String provider) {
         try {
             CookieManager manager = CookieManager.getInstance();
@@ -438,6 +486,38 @@ public class BridgeTokens {
             manager.flush();
         } catch (Throwable e) {
             Log.w(TAG, "clear web cookies failed: " + e.getClass().getSimpleName());
+        }
+    }
+
+    private static boolean hasLegacyCredentialFile(String provider) {
+        for (File file : legacyCredentialFiles(provider)) {
+            if (file.exists() && file.length() > 0) {
+                Log.i(TAG, "found legacy credential file provider=" + provider + " path=" + file.getAbsolutePath());
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<File> legacyCredentialFiles(String provider) {
+        List<File> files = new ArrayList<>();
+        String name = legacyCredentialFileName(provider);
+        if (TextUtils.isEmpty(name)) return files;
+        files.add(Path.root("FM", name));
+        files.add(new File("/storage/emulated/0/FM", name));
+        files.add(new File("/sdcard/FM", name));
+        return files;
+    }
+
+    private static String legacyCredentialFileName(String provider) {
+        switch (provider) {
+            case "baidu": return ".baidu";
+            case "quark": return ".quark";
+            case "uc": return ".uc";
+            case "ali": return ".ali";
+            case "115": return ".115";
+            case "123pan": return ".123pan";
+            default: return "";
         }
     }
 
@@ -453,7 +533,7 @@ public class BridgeTokens {
 
     private static boolean looksLikeCloud(Site site, JsonObject request, String message) {
         String text = joined(site, request, message);
-        return text.contains("网盘") || text.contains("云盘") || looksLikeQuark(text) || looksLikeUc(text) || text.contains("阿里") || text.contains("ali") || text.contains("百度") || text.contains("baidu") || text.contains("115") || text.contains("123pan") || text.contains("pan.") || text.contains("drive.");
+        return text.contains("网盘") || text.contains("云盘") || looksLikeQuark(text) || looksLikeUc(text) || looksLikeBaidu(text) || text.contains("阿里") || text.contains("ali") || text.contains("115") || text.contains("123pan") || text.contains("pan.") || text.contains("drive.");
     }
 
     private static boolean isTokenText(String text) {
@@ -478,7 +558,7 @@ public class BridgeTokens {
         if (looksLikeUc(text)) return "uc";
         if (looksLikeQuark(text)) return "quark";
         if (text.contains("ali") || text.contains("阿里") || text.contains("alipan") || text.contains("aliyundrive")) return "ali";
-        if (text.contains("百度") || text.contains("baidu") || text.contains("pan.baidu")) return "baidu";
+        if (looksLikeBaidu(text)) return "baidu";
         if (text.contains("115")) return "115";
         if (text.contains("123pan") || text.contains("123盘")) return "123pan";
         return "cloud";
@@ -490,6 +570,15 @@ public class BridgeTokens {
 
     private static boolean looksLikeUc(String text) {
         return text.contains("drive.uc.cn") || text.contains("uc网盘") || text.contains("uc 网盘") || text.contains("uc盘") || text.contains("uc原") || text.contains("uc智") || text.contains("uc_cookie") || text.contains("uccookie") || text.contains("uc_token");
+    }
+
+    private static boolean looksLikeBaidu(String text) {
+        return text.contains("百度")
+                || text.contains("baidu")
+                || text.contains("pan.baidu")
+                || text.contains("bpanso")
+                || text.contains("嘟嘟盘")
+                || (text.contains("\"share_id\"") && text.contains("\"uk\"") && text.contains("\"surl\""));
     }
 
     private static String joined(Site site, JsonObject request, String message) {
